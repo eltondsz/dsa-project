@@ -10,6 +10,17 @@ This is a hybrid Android application for peer-to-peer Bluetooth chatting. The co
 - **Python Brain:** Python 3, SQLite3, `cryptography` (Noise Protocol / AES-GCM)
 - **Bridge / Integration:** Chaquopy
 
+### Version Matrix
+
+To ensure strict cross-compatibility between the Android build system and the Python runtime, the AI agent must utilize the following versions:
+
+- **Android SDK:** Min SDK 24, Target SDK 34
+- **Android Gradle Plugin (AGP):** 8.2.+
+- **Kotlin Compiler:** 1.9.+
+- **Jetpack Compose:** BOM 2024.02.00+
+- **Chaquopy Plugin:** 15.0 (Requires Python 3.11)
+- **Python (Local & Core):** 3.11 (Managed via Poetry)
+
 ## 2. The Python Brain (~20%)
 
 - **Role:** Core logic, cryptography, multi-hop mesh routing, and SQLite database management.
