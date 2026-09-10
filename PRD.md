@@ -1,8 +1,8 @@
-# Product Requirements Document (PRD) — Bridgify
+# Product Requirements Document (PRD)
 
 ## 1. Overview
 
-**Bridgify** is an offline-first messenger that utilizes a peer-to-peer Bluetooth Low Energy (BLE) mesh network. It delivers encrypted text, voice notes, and lightweight media without relying on internet or cellular networks, offering users a familiar, modern chat experience.
+This application is an offline-first messenger that utilizes a peer-to-peer Bluetooth Low Energy (BLE) mesh network. It delivers encrypted text, voice notes, and lightweight media without relying on internet or cellular networks, offering users a familiar, modern chat experience.
 
 ## 2. MVP Scope (v1.0)
 
@@ -27,7 +27,7 @@
 
 - **Multi-Hop Routing:** Background packet relaying that utilizes intermediate devices to extend range (supporting up to 7 hops).
 - **Store-and-Forward Caching:** Encrypted messages for out-of-range users are cached locally in a SQLite database and automatically delivered when the recipient reconnects to the mesh.
-- **Nearby Peer Discovery:** Continuous background scanning to detect active Bridgify users in physical proximity.
+- **Nearby Peer Discovery:** Continuous background scanning to detect active app users in physical proximity.
 
 ### 2.4 Privacy, Security & Diagnostics
 
