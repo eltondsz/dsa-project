@@ -28,8 +28,7 @@ This is a hybrid Android application for peer-to-peer Bluetooth chatting. The co
 2. The Android shell passes raw byte-strings to the Python Brain via Chaquopy.
 3. The Python Brain decrypts, routes, and updates the local SQLite database, then returns the processed data payload back to the Android shell for UI rendering or re-broadcasting.
 
-## 5. Product Context & Feature Roadmap
+## 5. Product Context & Documentation
 
-For the full list of MVP features, UI expectations, and project scope, refer to [PRD.md](PRD.md).
-
-- Always verify feature specifications against `PRD.md` before generating new code or components.
+- **Features & Scope:** Refer to [PRD.md](PRD.md) for the full list of MVP requirements, UI expectations, and project scope. Always verify feature specifications against `PRD.md` before generating new code or components.
+- **System Design:** Refer to [ARCHITECTURE.md](ARCHITECTURE.md) for database schemas, BLE packet structures, and cryptography data flows.
