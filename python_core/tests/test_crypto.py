@@ -1,9 +1,3 @@
-import os
-import sys
-
-# Add the parent directory of this file (which is python_core) to the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from cryptography.exceptions import InvalidTag
 
 from crypto import decrypt, encrypt, generate_key

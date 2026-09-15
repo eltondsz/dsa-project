@@ -1,9 +1,5 @@
-import sys
 import uuid
 from typing import cast
-
-# Add the parent directory to the path so we can import core_logic
-sys.path.insert(0, "/Users/rampathak/Documents/dsa-project/python_core")
 
 import core_logic
 from crypto import decrypt

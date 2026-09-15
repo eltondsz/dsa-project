@@ -1,34 +1,26 @@
-import os
-import sys
-
-# Add the parent directory of this file (which is python_core) to the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import sqlite3
+from pathlib import Path
 
 from database import close_db_connection, init_database, trigger_panic_wipe
 
 
-def get_db_path():
+def get_db_path() -> Path:
     """Get the database path as used in database.py."""
-    # The database.py file is in python_core, which is now in the path
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    base_dir = os.path.join(base_dir, "..")
-    return os.path.join(base_dir, "database.db")
+    return Path(__file__).resolve().parent.parent / "database.db"
 
 
 def test_init_database_creates_tables():
     """Test that init_database creates the peers and messages tables."""
     # Clean up any existing database and connection
     db_path = get_db_path()
-    if os.path.exists(db_path):
-        os.remove(db_path)
     close_db_connection()
+    if db_path.exists():
+        db_path.unlink()
 
     # Initialize the database
     result = init_database()
     assert result is True, "init_database should return True on success"
-    assert os.path.exists(db_path), "Database file should be created"
+    assert db_path.exists(), "Database file should be created"
 
     # Check that tables exist
     conn = sqlite3.connect(db_path)
@@ -55,9 +47,9 @@ def test_trigger_panic_wipe_drops_tables():
     """Test that trigger_panic_wipe drops the tables."""
     # Clean up any existing database and connection
     db_path = get_db_path()
-    if os.path.exists(db_path):
-        os.remove(db_path)
     close_db_connection()
+    if db_path.exists():
+        db_path.unlink()
 
     # Initialize the database first
     result = init_database()
@@ -89,5 +81,5 @@ def test_trigger_panic_wipe_drops_tables():
 
     # Clean up
     close_db_connection()
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    if db_path.exists():
+        db_path.unlink()

@@ -274,5 +274,5 @@ dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "requests
 
 [metadata]
 lock-version = "2.1"
-python-versions = "^3.11"
-content-hash = "676946cbe2ea02ad7fe34e4abafae1cc4e8bca56d910832abf37d75b831f0f6a"
+python-versions = ">=3.11,<3.12"
+content-hash = "43e9c8f8d0d195e556885ccd0945663637e82eeebad0bb3ad4e607e39bf7d62d"
