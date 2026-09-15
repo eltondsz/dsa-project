@@ -14,7 +14,7 @@ def get_db_connection() -> sqlite3.Connection:
         db_path = os.path.join(base_dir, "database.db")
         _connection = sqlite3.connect(db_path)
         # Enable foreign key constraints
-        _connection.execute("PRAGMA foreign_keys = ON")
+        _ = _connection.execute("PRAGMA foreign_keys = ON")
     return _connection
 
 
@@ -28,7 +28,7 @@ def init_database() -> bool:
         cursor = conn.cursor()
 
         # Create peers table
-        cursor.execute("""
+        _ = cursor.execute("""
             CREATE TABLE IF NOT EXISTS peers (
                 peer_id TEXT PRIMARY KEY,
                 display_name TEXT,
@@ -38,7 +38,7 @@ def init_database() -> bool:
         """)
 
         # Create messages table
-        cursor.execute("""
+        _ = cursor.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 msg_id TEXT PRIMARY KEY,
                 sender_id TEXT,
@@ -68,8 +68,8 @@ def trigger_panic_wipe() -> bool:
         cursor = conn.cursor()
 
         # Drop tables in reverse order of dependencies (messages first due to foreign keys)
-        cursor.execute("DROP TABLE IF EXISTS messages")
-        cursor.execute("DROP TABLE IF EXISTS peers")
+        _ = cursor.execute("DROP TABLE IF EXISTS messages")
+        _ = cursor.execute("DROP TABLE IF EXISTS peers")
 
         conn.commit()
         return True

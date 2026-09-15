@@ -1,17 +1,21 @@
 import os
 import sys
+
 # Add the parent directory of this file (which is python_core) to the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import sqlite3
-from database import init_database, trigger_panic_wipe, close_db_connection
+
+from database import close_db_connection, init_database, trigger_panic_wipe
+
 
 def get_db_path():
     """Get the database path as used in database.py."""
     # The database.py file is in python_core, which is now in the path
     base_dir = os.path.abspath(os.path.dirname(__file__))
-    base_dir = os.path.join(base_dir, '..')
-    return os.path.join(base_dir, 'database.db')
+    base_dir = os.path.join(base_dir, "..")
+    return os.path.join(base_dir, "database.db")
+
 
 def test_init_database_creates_tables():
     """Test that init_database creates the peers and messages tables."""
@@ -31,20 +35,21 @@ def test_init_database_creates_tables():
     cursor = conn.cursor()
 
     # Check peers table
-    cursor.execute("""
+    _ = cursor.execute("""
         SELECT name FROM sqlite_master
         WHERE type='table' AND name='peers'
     """)
     assert cursor.fetchone() is not None, "peers table should exist"
 
     # Check messages table
-    cursor.execute("""
+    _ = cursor.execute("""
         SELECT name FROM sqlite_master
         WHERE type='table' AND name='messages'
     """)
     assert cursor.fetchone() is not None, "messages table should exist"
 
     conn.close()
+
 
 def test_trigger_panic_wipe_drops_tables():
     """Test that trigger_panic_wipe drops the tables."""
@@ -67,14 +72,14 @@ def test_trigger_panic_wipe_drops_tables():
     cursor = conn.cursor()
 
     # Check peers table is dropped
-    cursor.execute("""
+    _ = cursor.execute("""
         SELECT name FROM sqlite_master
         WHERE type='table' AND name='peers'
     """)
     assert cursor.fetchone() is None, "peers table should be dropped"
 
     # Check messages table is dropped
-    cursor.execute("""
+    _ = cursor.execute("""
         SELECT name FROM sqlite_master
         WHERE type='table' AND name='messages'
     """)

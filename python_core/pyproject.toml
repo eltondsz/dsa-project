@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Python core logic for Bluetooth chat application"
 authors = ["RamNileshPathak <ramnileshpathak@example.com>"]
 license = "MIT"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -15,3 +16,7 @@ pytest = "^8.0.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
