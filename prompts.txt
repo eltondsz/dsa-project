@@ -1,0 +1,9 @@
+Prompt 1: "Read the provided documentation files (AGENTS.md, CONTRACTS.md, PRD.md, ARCHITECTURE.md). We are going to build this application systematically step-by-step so I can understand the underlying architecture at every phase.
+Step 1: Execute Section 5 of CONTRACTS.md by generating the exact directory scaffolding and the required empty files. Do not generate any code yet.
+Step 2: Once the folders exist, initialize the Poetry environment inside the /python_core/ directory as defined in Section 4.1 of CONTRACTS.md. Generate the pyproject.toml file, ensuring you include the necessary dependencies for SQLite, pytest, and cryptography (for the Noise Protocol/AES-GCM).
+Walk me through your folder creation and briefly explain the dependencies you chose for the pyproject.toml file."
+
+Prompt 2: Let's move to Step 2: Building the offline storage engine.
+Write the complete code for python_core/database.py. You must implement the schema defined in Section 2 of CONTRACTS.md (peers and messages tables).
+You must also implement the init_database() -> bool and trigger_panic_wipe() -> bool functions. Crucially, ensure you implement the absolute file path constraint for Chaquopy/Android as explicitly detailed in Section 1 of CONTRACTS.md.
+Once database.py is written, generate a pytest suite in python_core/tests/test_database.py to verify that the tables are created successfully and that the panic wipe effectively drops the tables. Do not write the crypto.py logic yet."
