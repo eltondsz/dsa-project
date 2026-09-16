@@ -1,6 +1,8 @@
 import os
 import sqlite3
 
+from schema import ALL_TABLES, topological_drop_order
+
 # Global connection object
 _connection: sqlite3.Connection | None = None
 
@@ -8,13 +10,19 @@ _connection: sqlite3.Connection | None = None
 def get_db_connection() -> sqlite3.Connection:
     """Get or create a database connection with absolute path for Android compatibility."""
     global _connection
+
     if _connection is None:
         # Construct absolute path using the directory of this file
         base_dir = os.path.abspath(os.path.dirname(__file__))
-        db_path = os.path.join(base_dir, "database.db")
+
+        DB_FILE_NAME = "database.db"
+        db_path = os.path.join(base_dir, DB_FILE_NAME)
+
         _connection = sqlite3.connect(db_path)
+
         # Enable foreign key constraints
         _ = _connection.execute("PRAGMA foreign_keys = ON")
+
     return _connection
 
 
@@ -24,35 +32,15 @@ def init_database() -> bool:
     Returns True if successful, False otherwise.
     """
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        connection = get_db_connection()
+        cursor = connection.cursor()
 
-        # Create peers table
-        _ = cursor.execute("""
-            CREATE TABLE IF NOT EXISTS peers (
-                peer_id TEXT PRIMARY KEY,
-                display_name TEXT,
-                public_key BLOB,
-                last_seen INTEGER
-            )
-        """)
+        for table in ALL_TABLES:
+            _ = cursor.execute(table.create_sql())
 
-        # Create messages table
-        _ = cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                msg_id TEXT PRIMARY KEY,
-                sender_id TEXT,
-                recipient_id TEXT,
-                payload TEXT,
-                timestamp INTEGER,
-                status INTEGER,
-                FOREIGN KEY (sender_id) REFERENCES peers (peer_id),
-                FOREIGN KEY (recipient_id) REFERENCES peers (peer_id)
-            )
-        """)
-
-        conn.commit()
+        connection.commit()
         return True
+
     except sqlite3.Error as e:
         print(f"Database initialization error: {e}")
         return False
@@ -64,14 +52,14 @@ def trigger_panic_wipe() -> bool:
     Returns True if successful, False otherwise.
     """
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        connection = get_db_connection()
+        cursor = connection.cursor()
 
         # Drop tables in reverse order of dependencies (messages first due to foreign keys)
-        _ = cursor.execute("DROP TABLE IF EXISTS messages")
-        _ = cursor.execute("DROP TABLE IF EXISTS peers")
+        for table in topological_drop_order(ALL_TABLES):
+            _ = cursor.execute(f"DROP TABLE IF EXISTS {table.name}")
 
-        conn.commit()
+        connection.commit()
         return True
     except sqlite3.Error as e:
         print(f"Panic wipe error: {e}")
@@ -81,6 +69,7 @@ def trigger_panic_wipe() -> bool:
 # Optional: Close connection when needed (for cleanup)
 def close_db_connection():
     global _connection
+
     if _connection is not None:
         _connection.close()
         _connection = None
