@@ -2,6 +2,8 @@ import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+NONCE_NBYTES = 12
+
 
 def generate_key() -> bytes:
     """
@@ -9,7 +11,8 @@ def generate_key() -> bytes:
     Returns:
         bytes: The generated key (32 bytes).
     """
-    return AESGCM.generate_key(bit_length=256)
+    KEY_LENGTH = 256
+    return AESGCM.generate_key(bit_length=KEY_LENGTH)
 
 
 def encrypt(plaintext: bytes, key: bytes) -> bytes:
@@ -22,8 +25,10 @@ def encrypt(plaintext: bytes, key: bytes) -> bytes:
         bytes: The nonce (12 bytes) concatenated with the ciphertext.
     """
     aesgcm = AESGCM(key)
-    nonce = os.urandom(12)  # 96-bit nonce for AES-GCM
+
+    nonce = os.urandom(NONCE_NBYTES)
     ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+
     return nonce + ciphertext
 
 
@@ -38,9 +43,12 @@ def decrypt(encrypted_data: bytes, key: bytes) -> bytes:
     Raises:
         InvalidTag: If the ciphertext does not authenticate with the key.
     """
-    if len(encrypted_data) < 12:
+    if len(encrypted_data) < NONCE_NBYTES:
         raise ValueError("Encrypted data too short to contain a nonce.")
-    nonce = encrypted_data[:12]
-    ciphertext = encrypted_data[12:]
+
+    nonce = encrypted_data[:NONCE_NBYTES]
+    ciphertext = encrypted_data[NONCE_NBYTES:]
+
     aesgcm = AESGCM(key)
+
     return aesgcm.decrypt(nonce, ciphertext, None)
