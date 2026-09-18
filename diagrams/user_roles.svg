@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="720" viewBox="0 0 1020 720" role="img" aria-labelledby="title desc">
+  <title id="title">User Roles</title>
+  <desc id="desc">Generated from PRD.md, ARCHITECTURE.md, CONTRACTS.md, and current source files.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="openArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#334155" stroke-width="1.8"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="32" y="42" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">User Roles</text>
+  
+  
+  <rect x="60" y="110" width="260" height="470" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="60" y="110" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 60 144 H 320" stroke="#64748b" stroke-width="1.5"/>
+  <text x="190" y="133" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">End User</text>
+  <text x="74" y="168" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Creates local identity</text>
+<text x="74" y="187" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Grants Bluetooth permissions</text>
+<text x="74" y="206" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Sends and receives DMs</text>
+<text x="74" y="225" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Joins group chats</text>
+<text x="74" y="244" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Sets message expiry</text>
+<text x="74" y="263" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Uses panic wipe</text>
+  
+  
+  <rect x="380" y="110" width="260" height="470" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="380" y="110" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 380 144 H 640" stroke="#64748b" stroke-width="1.5"/>
+  <text x="510" y="133" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Group Admin</text>
+  <text x="394" y="168" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Creates or names group</text>
+<text x="394" y="187" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Sets group display photo</text>
+<text x="394" y="206" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Manages basic admin controls</text>
+<text x="394" y="225" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Participates as normal user</text>
+<text x="394" y="244" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Keeps group metadata local</text>
+  
+  
+  <rect x="700" y="110" width="260" height="470" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="700" y="110" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 700 144 H 960" stroke="#64748b" stroke-width="1.5"/>
+  <text x="830" y="133" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Relay Peer</text>
+  <text x="714" y="168" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Discovers nearby devices</text>
+<text x="714" y="187" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Forwards encrypted packets</text>
+<text x="714" y="206" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Caches undelivered payloads</text>
+<text x="714" y="225" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Cannot read message contents</text>
+<text x="714" y="244" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Contributes hop path health</text>
+  
+  
+  <line x1="320" y1="345" x2="380" y2="345" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="350" y="337" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">can become</text>
+  
+  
+  <line x1="640" y1="345" x2="700" y2="345" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="670" y="337" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">also acts as</text>
+  
+  <text x="60" y="645" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569" text-anchor="start">All app users may act as relay peers because mesh forwarding is part of the offline-first design.</text>
+
+</svg>
