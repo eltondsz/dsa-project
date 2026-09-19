@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" role="img" aria-labelledby="title desc">
+  <title id="title">Stakeholder Diagram</title>
+  <desc id="desc">Generated from PRD.md, ARCHITECTURE.md, CONTRACTS.md, and current source files.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="openArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#334155" stroke-width="1.8"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="32" y="42" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">Stakeholder Diagram</text>
+  
+  
+  <rect x="430" y="300" width="260" height="120" rx="4" fill="#ffffff" stroke="#475569" stroke-width="1.5"/>
+  <rect x="430" y="300" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#475569" stroke-width="1.5"/>
+  <path d="M 430 334 H 690" stroke="#475569" stroke-width="1.5"/>
+  <text x="560" y="323" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Offline BLE Mesh Chat</text>
+  <text x="444" y="358" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Encrypted messenger</text>
+<text x="444" y="377" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">No internet/cellular dependency</text>
+<text x="444" y="396" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Android + Python hybrid</text>
+  
+  
+  <rect x="60" y="90" width="260" height="130" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="60" y="90" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 60 124 H 320" stroke="#64748b" stroke-width="1.5"/>
+  <text x="190" y="113" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Primary Users</text>
+  <text x="74" y="148" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">People needing offline messaging</text>
+<text x="74" y="167" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Group chat participants</text>
+<text x="74" y="186" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Users in low-connectivity areas</text>
+  
+  
+  <rect x="430" y="90" width="260" height="130" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="430" y="90" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 430 124 H 690" stroke="#64748b" stroke-width="1.5"/>
+  <text x="560" y="113" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Developers</text>
+  <text x="444" y="148" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Android UI/BLE implementation</text>
+<text x="444" y="167" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Python crypto/routing/database</text>
+<text x="444" y="186" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Testing and packaging</text>
+  
+  
+  <rect x="800" y="90" width="260" height="130" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="800" y="90" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 800 124 H 1060" stroke="#64748b" stroke-width="1.5"/>
+  <text x="930" y="113" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Project Evaluators</text>
+  <text x="814" y="148" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">College/project reviewers</text>
+<text x="814" y="167" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Architecture readers</text>
+<text x="814" y="186" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Security/privacy reviewers</text>
+  
+  
+  <rect x="60" y="530" width="260" height="130" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="60" y="530" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 60 564 H 320" stroke="#64748b" stroke-width="1.5"/>
+  <text x="190" y="553" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Android Platform</text>
+  <text x="74" y="588" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Runtime permissions</text>
+<text x="74" y="607" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">BLE hardware limits</text>
+<text x="74" y="626" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Background execution rules</text>
+  
+  
+  <rect x="430" y="530" width="260" height="130" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="430" y="530" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 430 564 H 690" stroke="#64748b" stroke-width="1.5"/>
+  <text x="560" y="553" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Nearby Community</text>
+  <text x="444" y="588" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Relay devices</text>
+<text x="444" y="607" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Message recipients</text>
+<text x="444" y="626" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Group members</text>
+  
+  
+  <rect x="800" y="530" width="260" height="130" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="800" y="530" width="260" height="34" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M 800 564 H 1060" stroke="#64748b" stroke-width="1.5"/>
+  <text x="930" y="553" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">Maintenance Owners</text>
+  <text x="814" y="588" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Dependency updates</text>
+<text x="814" y="607" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Schema changes</text>
+<text x="814" y="626" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Security fixes</text>
+  
+  
+  <line x1="320" y1="155" x2="430" y2="330" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="375" y="234.5" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">needs</text>
+  
+  
+  <line x1="560" y1="220" x2="560" y2="300" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="560" y="252" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">builds</text>
+  
+  
+  <line x1="800" y1="155" x2="690" y2="330" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="745" y="234.5" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">assesses</text>
+  
+  
+  <line x1="320" y1="595" x2="430" y2="390" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="375" y="484.5" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">constrains</text>
+  
+  
+  <line x1="560" y1="530" x2="560" y2="420" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="560" y="467" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">uses</text>
+  
+  
+  <line x1="800" y1="595" x2="690" y2="390" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="745" y="484.5" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">sustains</text>
+  
+
+</svg>

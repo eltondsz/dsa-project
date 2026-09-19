@@ -44,3 +44,4 @@ To ensure strict cross-compatibility between the Android build system and the Py
 - **Features & Scope:** Refer to [PRD.md](PRD.md) for the full list of MVP requirements, UI expectations, and project scope. Always verify feature specifications against `PRD.md` before generating new code or components.
 - **System Design:** Refer to [ARCHITECTURE.md](ARCHITECTURE.md) for database schemas, BLE packet structures, and cryptography data flows.
 - **API & Data Contracts:** Refer to [CONTRACTS.md](CONTRACTS.md) for Chaquopy function signatures, database schemas, and byte-level payload structures.
+- **UI Design System:** Refer to [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) for exact Figma color tokens, typography scales, layout metrics, and Jetpack Compose component specs.

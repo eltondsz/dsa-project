@@ -2,8 +2,6 @@
 __pycache__
 .pytest_cache
 
-.vscode
-.zed
 
 Thumbs.db
 .DS_Store
@@ -11,3 +9,19 @@ Thumbs.db
 keystore_priv.bin
 keystore_pub.bin
 device_id.txt
+
+.zed
+.vscode
+local.properties
+.gradle
+build
+android_app/build
+requirements.txt
+
+android_app/src/main/java/
+android_app/src/main/res/
+gradle.properties
+gradle/
+gradlew
+gradlew.bat
+settings.gradle.kts

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="720" viewBox="0 0 1180 720" role="img" aria-labelledby="title desc">
+  <title id="title">UML Component Diagram - Hybrid Architecture</title>
+  <desc id="desc">Generated from PRD.md, ARCHITECTURE.md, CONTRACTS.md, and current source files.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="openArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#334155" stroke-width="1.8"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="32" y="42" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">UML Component Diagram - Hybrid Architecture</text>
+  
+  
+  <rect x="60" y="110" width="280" height="190" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="306" y="126" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="306" y="146" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="78" y="138" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="200" y="160" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Android Shell</text>
+  <text x="78" y="192" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Jetpack Compose UI</text>
+<text x="78" y="211" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Permission handling</text>
+<text x="78" y="230" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">BLE lifecycle owner</text>
+<text x="78" y="249" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">MTU chunking</text>
+  
+  
+  <rect x="450" y="110" width="280" height="190" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="696" y="126" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="696" y="146" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="468" y="138" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="590" y="160" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Chaquopy Bridge</text>
+  <text x="468" y="192" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Loads Python module</text>
+<text x="468" y="211" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Kotlin .callAttr()</text>
+<text x="468" y="230" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Passes bytes/dicts</text>
+  
+  
+  <rect x="840" y="110" width="280" height="190" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="1086" y="126" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="1086" y="146" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="858" y="138" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="980" y="160" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Python Brain</text>
+  <text x="858" y="192" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Core entry points</text>
+<text x="858" y="211" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Mesh route decisions</text>
+<text x="858" y="230" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Store-and-forward</text>
+  
+  
+  <rect x="60" y="410" width="280" height="130" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="306" y="426" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="306" y="446" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="78" y="438" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="200" y="460" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Android BLE APIs</text>
+  <text x="78" y="492" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">android.bluetooth.le</text>
+<text x="78" y="511" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Scan / advertise</text>
+  
+  
+  <rect x="450" y="410" width="280" height="130" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="696" y="426" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="696" y="446" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="468" y="438" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="590" y="460" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Nearby Devices</text>
+  <text x="468" y="492" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Direct recipient</text>
+<text x="468" y="511" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Relay peer</text>
+<text x="468" y="530" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Group participant</text>
+  
+  
+  <rect x="820" y="410" width="150" height="130" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="936" y="426" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="936" y="446" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="838" y="438" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="895" y="460" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Crypto</text>
+  <text x="838" y="492" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">AES-GCM</text>
+<text x="838" y="511" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">Noise target</text>
+  
+  
+  <rect x="990" y="410" width="150" height="130" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <rect x="1106" y="426" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <rect x="1106" y="446" width="22" height="14" fill="#ffffff" stroke="#334155" stroke-width="1.3"/>
+  <text x="1008" y="438" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" fill="#475569" text-anchor="start">&lt;&lt;component&gt;&gt;</text>
+  <text x="1065" y="460" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">SQLite</text>
+  <text x="1008" y="492" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">peers</text>
+<text x="1008" y="511" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="start">messages</text>
+  
+  
+  <line x1="340" y1="205" x2="450" y2="205" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="395" y="197" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">raw bytes</text>
+  
+  
+  <line x1="730" y1="205" x2="840" y2="205" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="785" y="197" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">callAttr</text>
+  
+  
+  <line x1="980" y1="300" x2="895" y2="410" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="937.5" y="347" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">uses</text>
+  
+  
+  <line x1="990" y1="300" x2="1065" y2="410" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="1027.5" y="347" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">persists</text>
+  
+  
+  <line x1="200" y1="300" x2="200" y2="410" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="200" y="347" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">controls</text>
+  
+  
+  <line x1="340" y1="475" x2="450" y2="475" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="395" y="467" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">BLE packets</text>
+  
+  
+  <path d="M 840 235 L 760 235 L 760 475 L 730 475" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+  <text x="760" y="467" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">encrypted payloads</text>
+  
+  <text x="60" y="665" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569" text-anchor="start">Boundary rule: Android owns UI/BLE hardware; Python owns cryptography, routing, and SQLite.</text>
+
+</svg>
