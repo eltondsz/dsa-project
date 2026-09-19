@@ -7,3 +7,13 @@ Prompt 2: Let's move to Step 2: Building the offline storage engine.
 Write the complete code for python_core/database.py. You must implement the schema defined in Section 2 of CONTRACTS.md (peers and messages tables).
 You must also implement the init_database() -> bool and trigger_panic_wipe() -> bool functions. Crucially, ensure you implement the absolute file path constraint for Chaquopy/Android as explicitly detailed in Section 1 of CONTRACTS.md.
 Once database.py is written, generate a pytest suite in python_core/tests/test_database.py to verify that the tables are created successfully and that the panic wipe effectively drops the tables. Do not write the crypto.py logic yet."
+
+Prompt 3: Let's move to Step 3: Building the Cryptography Engine.
+Write the implementation for python_core/crypto.py. Using the installed cryptography library, implement AES-GCM for our End-to-End Encryption (E2EE) as required by the ARCHITECTURE.md and PRD.md files.
+Provide functions to generate a key, encrypt a plaintext message into ciphertext, and decrypt it back.
+Once crypto.py is written, generate a pytest suite in python_core/tests/test_crypto.py to verify that a message encrypts and decrypts correctly, and that attempting to decrypt a tampered ciphertext raises the appropriate exception. Do not write the core_logic.py bridge yet."
+
+Prompt 4: Let's move to Step 4: Building the Chaquopy Bridge.
+Write the implementation for python_core/core_logic.py. You must strictly implement the four functions defined in Section 1 of CONTRACTS.md (init_database, process_incoming_ble, prepare_outgoing_message, and trigger_panic_wipe).
+This file must import and orchestrate the logic from the database.py and crypto.py files you already wrote. Pay close attention to the BLE Packet Structure (Byte Map) defined in Section 3 of CONTRACTS.md when structuring the incoming and outgoing raw bytes.
+Finally, write a pytest suite in python_core/tests/test_core_logic.py to simulate a full round-trip: generating an outgoing message, processing it as an incoming message, and verifying it hits the database correctly.

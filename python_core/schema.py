@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import IntEnum
 from textwrap import indent
 
 
@@ -16,21 +17,81 @@ class ForeignKey:
     ref_column: str
 
 
+class ColumnContainer:
+    """Allows attribute-style access to columns (e.g., container.peer_id)
+    while preserving iteration for SQL generation."""
+
+    def __init__(self, columns: tuple[Column, ...]):
+        self._columns: tuple[Column, ...] = columns
+
+    def __getattr__(self, name: str) -> Column:
+        for c in self._columns:
+            if c.name == name:
+                return c
+
+        raise AttributeError(f"Column '{name}' not found")
+
+    def __iter__(self):
+        return iter(self._columns)
+
+    def __len__(self) -> int:
+        return len(self._columns)
+
+    def __getitem__(self, index: int | slice) -> Column | tuple[Column, ...]:
+        return self._columns[index]
+
+
+class ForeignKeyContainer:
+    """Allows attribute-style access to foreign keys (e.g., container.sender_id)
+    while preserving iteration for SQL generation."""
+
+    def __init__(self, foreign_keys: tuple[ForeignKey, ...]):
+        self._foreign_keys: tuple[ForeignKey, ...] = foreign_keys
+
+    def __getattr__(self, name: str) -> ForeignKey:
+        for fk in self._foreign_keys:
+            if fk.column == name:
+                return fk
+
+        raise AttributeError(f"ForeignKey '{name}' not found")
+
+    def __iter__(self):
+        return iter(self._foreign_keys)
+
+    def __len__(self) -> int:
+        return len(self._foreign_keys)
+
+    def __getitem__(self, index: int | slice) -> ForeignKey | tuple[ForeignKey, ...]:
+        return self._foreign_keys[index]
+
+
 @dataclass(frozen=True)
 class Table:
     name: str
-    columns: tuple[Column, ...]
-    foreign_keys: tuple[ForeignKey, ...] = ()
+    columns: ColumnContainer
+    foreign_keys: ForeignKeyContainer
+
+    def __init__(
+        self,
+        name: str,
+        columns: tuple[Column, ...],
+        foreign_keys: tuple[ForeignKey, ...] = (),
+    ):
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "columns", ColumnContainer(columns))
+        object.__setattr__(self, "foreign_keys", ForeignKeyContainer(foreign_keys))
 
     def create_sql(self) -> str:
         col_lines = [
             f"{c.name} {c.sql_type}" + (" PRIMARY KEY" if c.primary_key else "")
             for c in self.columns
         ]
+
         fk_lines = [
             f"FOREIGN KEY ({fk.column}) REFERENCES {fk.ref_table} ({fk.ref_column})"
             for fk in self.foreign_keys
         ]
+
         body = indent(",\n".join(col_lines + fk_lines), "    ")
         return f"CREATE TABLE IF NOT EXISTS {self.name} (\n{body}\n)"
 
@@ -39,11 +100,16 @@ PEERS = Table(
     name="peers",
     columns=(
         Column("peer_id", "TEXT", primary_key=True),
-        Column("display_name", "TEXT"),
         Column("public_key", "BLOB"),
         Column("last_seen", "INTEGER"),
     ),
 )
+
+
+class MessageStatus(IntEnum):
+    SENT = 0
+    RECEIVED = 1
+
 
 MESSAGES = Table(
     name="messages",

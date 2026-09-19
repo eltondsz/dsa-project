@@ -1,0 +1,14 @@
+from enum import IntEnum
+
+
+class ErrorCode(IntEnum):
+    OK = 0
+    DATABASE_ERROR = 1
+    KEYSTORE_ERROR = 2
+    ENCRYPTION_FAILED = 3
+    DECRYPTION_FAILED = 4
+    MISSING_PUBLIC_KEY = 5
+    DUPLICATE_MESSAGE = 6
+    INVALID_PACKET = 7
+    UNKNOWN_PACKET_TYPE = 8
+    INVALID_UUID = 9

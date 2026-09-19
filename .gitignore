@@ -2,4 +2,12 @@
 __pycache__
 .pytest_cache
 
+.vscode
+.zed
+
+Thumbs.db
 .DS_Store
+
+keystore_priv.bin
+keystore_pub.bin
+device_id.txt

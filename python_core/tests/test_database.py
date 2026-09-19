@@ -13,7 +13,7 @@ def test_init_database_creates_tables():
     """Test that init_database creates the peers and messages tables."""
     # Clean up any existing database and connection
     db_path = get_db_path()
-    close_db_connection()
+    _ = close_db_connection()
     if db_path.exists():
         db_path.unlink()
 
@@ -47,7 +47,7 @@ def test_trigger_panic_wipe_drops_tables():
     """Test that trigger_panic_wipe drops the tables."""
     # Clean up any existing database and connection
     db_path = get_db_path()
-    close_db_connection()
+    _ = close_db_connection()
     if db_path.exists():
         db_path.unlink()
 
@@ -80,6 +80,6 @@ def test_trigger_panic_wipe_drops_tables():
     conn.close()
 
     # Clean up
-    close_db_connection()
+    _ = close_db_connection()
     if db_path.exists():
         db_path.unlink()

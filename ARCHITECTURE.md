@@ -24,3 +24,10 @@ The application operates on a hybrid architecture strictly separating the native
 - **Ephemeral Storage:** SQLite3 securely stores custom display names, avatars, and messages until user-configured expiration timers trigger auto-deletion.
 - **Packet Handling:** To respect BLE bandwidth limitations, large video media is excluded, and small payloads (like text and voice notes) are efficiently chunked at the hardware layer.
 - **Network Proximity:** The system relies on continuous background scanning to facilitate peer network discovery and active proximity alerts.
+-
+
+## Development Constraints
+
+- **OS-Agnostic Environment:** The local codebase must remain portable and fully compatible across Windows, macOS, and Linux.
+- **Pathing:** All file operations (especially SQLite database initialization via Chaquopy) must use standard, OS-safe Python pathing (e.g., `os.path.join`, `os.path.abspath`) rather than hardcoded OS-specific slashes.
+- **Dependency Management:** Python dependencies are managed strictly via Poetry to ensure reproducible virtual environments across different operating systems.
