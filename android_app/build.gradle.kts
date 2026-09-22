@@ -41,7 +41,6 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.11"
-        buildPython("C:/Python311/python.exe")
         pip {
             install("-r", "../python_core/requirements.txt")
         }

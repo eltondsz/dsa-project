@@ -16,10 +16,6 @@ local.properties
 .gradle
 build
 android_app/build
-requirements.txt
-
-android_app/src/main/java/
-android_app/src/main/res/
 gradle.properties
 gradle/
 gradlew
