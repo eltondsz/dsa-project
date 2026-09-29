@@ -136,7 +136,7 @@ fun NearbyRadarScreen(
             }
             Box(
                 modifier = Modifier
-                    .size(190.dp)
+                    .size(120.dp)
                     .clip(CircleShape)
                     .background(SurfaceDark.copy(alpha = 0.5f))
                     .border(1.dp, DividerColor, CircleShape),
@@ -144,19 +144,19 @@ fun NearbyRadarScreen(
             ) {
                 RadarPulseGraphic(
                     isScanning = viewModel.isScanningNearby,
-                    modifier = Modifier.size(180.dp)
+                    modifier = Modifier.size(112.dp)
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
-                text = if (viewModel.isScanningNearby) "Scanning for BLE advertising beacons..." else "Scan paused",
+                text = if (viewModel.isScanningNearby) "Scanning for NetChat mobile mesh nodes..." else "Scan paused",
                 color = TextSecondary,
                 fontSize = 12.sp
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
             // Found Peers List
             Row(
@@ -179,12 +179,40 @@ fun NearbyRadarScreen(
                 )
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (viewModel.nearbyPeers.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📡", fontSize = 28.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "No NetChat nodes detected yet",
+                                    color = TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Make sure the other phone has NetChat running with Bluetooth enabled.",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
                 items(viewModel.nearbyPeers, key = { it.id }) { peer ->
                     DiscoveredPeerRow(
                         peer = peer,

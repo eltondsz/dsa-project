@@ -1,6 +1,8 @@
 package com.app.chat.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,8 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.chat.model.MediaType
@@ -75,36 +80,71 @@ fun DirectChatScreen(
         }
     }
 
+    val context = LocalContext.current
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.sendImageMedia(uri, context)
+        }
+    }
+
     if (viewModel.showAttachmentDialog) {
         AttachmentChooserDialog(
-            onSendPhoto = { viewModel.sendImageMessage(it) },
+            onPickGallery = {
+                viewModel.showAttachmentDialog = false
+                photoPickerLauncher.launch("image/*")
+            },
             onDismiss = { viewModel.showAttachmentDialog = false }
         )
     }
 
-    Column(
+    Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        // Chat Header
-        ChatTopBar(
-            title = conversation?.name ?: "Direct Chat",
-            subtitle = if (conversation?.isOnline == true) "● Online via Bluetooth" else "○ Last seen 10m ago",
-            isOnline = conversation?.isOnline == true,
-            avatarInitials = conversation?.avatarInitials ?: "P",
-            onBack = { viewModel.handleBack() }
-        )
-
-        // Messages List
+            .imePadding(),
+        containerColor = BackgroundDark,
+        topBar = {
+            Box(Modifier.statusBarsPadding()) {
+                ChatTopBar(
+                    title = conversation?.name ?: "Direct Chat",
+                    subtitle = if (conversation?.isOnline == true) "● Online via Bluetooth" else "○ Last seen 10m ago",
+                    isOnline = conversation?.isOnline == true,
+                    avatarInitials = conversation?.avatarInitials ?: "P",
+                    onBack = { viewModel.handleBack() }
+                )
+            }
+        },
+        bottomBar = {
+            Box(Modifier.navigationBarsPadding()) {
+                if (viewModel.isRecordingVoice) {
+                    VoiceRecordingActiveBar(
+                        durationSec = viewModel.voiceRecordDurationSeconds,
+                        onSend = { viewModel.toggleVoiceRecording() },
+                        onCancel = { viewModel.cancelVoiceRecording() }
+                    )
+                } else {
+                    MessageInputField(
+                        text = inputText,
+                        onTextChange = { inputText = it },
+                        onSend = {
+                            if (inputText.isNotBlank()) {
+                                viewModel.sendMessage(inputText)
+                                inputText = ""
+                            }
+                        },
+                        onAttach = { viewModel.showAttachmentDialog = true },
+                        onVoiceRecord = { viewModel.toggleVoiceRecording() }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -142,28 +182,6 @@ fun DirectChatScreen(
                 )
             }
         }
-
-        // Voice recording bar or normal input bar
-        if (viewModel.isRecordingVoice) {
-            VoiceRecordingActiveBar(
-                durationSec = viewModel.voiceRecordDurationSeconds,
-                onSend = { viewModel.toggleVoiceRecording() },
-                onCancel = { viewModel.cancelVoiceRecording() }
-            )
-        } else {
-            MessageInputField(
-                text = inputText,
-                onTextChange = { inputText = it },
-                onSend = {
-                    if (inputText.isNotBlank()) {
-                        viewModel.sendMessage(inputText)
-                        inputText = ""
-                    }
-                },
-                onAttach = { viewModel.showAttachmentDialog = true },
-                onVoiceRecord = { viewModel.toggleVoiceRecording() }
-            )
-        }
     }
 }
 
@@ -186,36 +204,71 @@ fun GroupChatScreen(
         }
     }
 
+    val context = LocalContext.current
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.sendImageMedia(uri, context)
+        }
+    }
+
     if (viewModel.showAttachmentDialog) {
         AttachmentChooserDialog(
-            onSendPhoto = { viewModel.sendImageMessage(it) },
+            onPickGallery = {
+                viewModel.showAttachmentDialog = false
+                photoPickerLauncher.launch("image/*")
+            },
             onDismiss = { viewModel.showAttachmentDialog = false }
         )
     }
 
-    Column(
+    Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        // Group Header
-        ChatTopBar(
-            title = conversation?.name ?: "Group Chat",
-            subtitle = "${conversation?.membersCount ?: 4} members • Multi-hop Mesh",
-            isOnline = true,
-            avatarInitials = conversation?.avatarInitials ?: "G",
-            onBack = { viewModel.handleBack() }
-        )
-
-        // Messages List
+            .imePadding(),
+        containerColor = BackgroundDark,
+        topBar = {
+            Box(Modifier.statusBarsPadding()) {
+                ChatTopBar(
+                    title = conversation?.name ?: "Group Chat",
+                    subtitle = "${conversation?.membersCount ?: 4} members • Multi-hop Mesh",
+                    isOnline = true,
+                    avatarInitials = conversation?.avatarInitials ?: "G",
+                    onBack = { viewModel.handleBack() }
+                )
+            }
+        },
+        bottomBar = {
+            Box(Modifier.navigationBarsPadding()) {
+                if (viewModel.isRecordingVoice) {
+                    VoiceRecordingActiveBar(
+                        durationSec = viewModel.voiceRecordDurationSeconds,
+                        onSend = { viewModel.toggleVoiceRecording() },
+                        onCancel = { viewModel.cancelVoiceRecording() }
+                    )
+                } else {
+                    MessageInputField(
+                        text = inputText,
+                        onTextChange = { inputText = it },
+                        onSend = {
+                            if (inputText.isNotBlank()) {
+                                viewModel.sendMessage(inputText)
+                                inputText = ""
+                            }
+                        },
+                        onAttach = { viewModel.showAttachmentDialog = true },
+                        onVoiceRecord = { viewModel.toggleVoiceRecording() }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -253,28 +306,6 @@ fun GroupChatScreen(
                     onToggleVoice = { viewModel.toggleVoicePlay(msg.id) }
                 )
             }
-        }
-
-        // Voice recording or message input
-        if (viewModel.isRecordingVoice) {
-            VoiceRecordingActiveBar(
-                durationSec = viewModel.voiceRecordDurationSeconds,
-                onSend = { viewModel.toggleVoiceRecording() },
-                onCancel = { viewModel.cancelVoiceRecording() }
-            )
-        } else {
-            MessageInputField(
-                text = inputText,
-                onTextChange = { inputText = it },
-                onSend = {
-                    if (inputText.isNotBlank()) {
-                        viewModel.sendMessage(inputText)
-                        inputText = ""
-                    }
-                },
-                onAttach = { viewModel.showAttachmentDialog = true },
-                onVoiceRecord = { viewModel.toggleVoiceRecording() }
-            )
         }
     }
 }
@@ -321,12 +352,16 @@ fun ChatTopBar(
                 text = title,
                 color = TextPrimary,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
                 color = if (isOnline) Color(0xFF00E676) else TextSecondary,
-                fontSize = 11.sp
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -409,6 +444,7 @@ fun MessageBubble(
                     MediaType.Image -> {
                         ImagePreviewCard(
                             imageLabel = message.text,
+                            thumbnailBase64 = message.mediaThumbnail,
                             modifier = Modifier.padding(bottom = 6.dp)
                         )
                     }
@@ -514,18 +550,18 @@ fun VoiceRecordingActiveBar(
 
 @Composable
 fun AttachmentChooserDialog(
-    onSendPhoto: (String) -> Unit,
+    onPickGallery: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
         title = {
-            Text("Attach to Encrypted Chat", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Attach Photo", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         },
         text = {
             Column {
-                Text("Choose media to encrypt and transmit via mesh packets:", color = TextSecondary, fontSize = 13.sp)
+                Text("Select an image from device gallery to encrypt and transmit peer-to-peer:", color = TextSecondary, fontSize = 13.sp)
                 Spacer(Modifier.height(16.dp))
 
                 Row(
@@ -533,34 +569,15 @@ fun AttachmentChooserDialog(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(BackgroundDark)
-                        .clickable { onSendPhoto("Summit Trail Camera Shot") }
+                        .clickable { onPickGallery() }
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("📷", fontSize = 20.sp)
+                    Text("🖼️", fontSize = 22.sp)
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Take Camera Photo", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("Compressed for BLE chunking", color = TextSecondary, fontSize = 11.sp)
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(BackgroundDark)
-                        .clickable { onSendPhoto("Campsite Map Blueprint") }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🖼️", fontSize = 20.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Send Stored Image", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("Gallery asset", color = TextSecondary, fontSize = 11.sp)
+                        Text("Photo from Device Gallery", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("Compressed and sent over Bluetooth mesh", color = TextSecondary, fontSize = 11.sp)
                     }
                 }
             }

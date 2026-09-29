@@ -2,15 +2,18 @@ package com.app.chat.ble
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -21,12 +24,16 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import com.app.chat.bridge.PythonCoreBridge
 import com.app.chat.model.PeerDevice
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 
 @SuppressLint("MissingPermission")
 class BleMeshManager private constructor(private val context: Context) {
@@ -35,6 +42,9 @@ class BleMeshManager private constructor(private val context: Context) {
         private const val TAG = "BleMeshManager"
         val SERVICE_UUID: UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb")
         val CHARACTERISTIC_UUID: UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
+        val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private const val MAGIC_CHUNK_BYTE: Byte = 0xFD.toByte()
+        private const val MAX_CHUNK_PAYLOAD = 16
 
         @Volatile
         private var instance: BleMeshManager? = null
@@ -53,11 +63,21 @@ class BleMeshManager private constructor(private val context: Context) {
     private var scanner: BluetoothLeScanner? = null
     private var gattServer: BluetoothGattServer? = null
 
-    private val discoveredPeersMap = ConcurrentHashMap<String, PeerDevice>()
-    private val activeConnections = ConcurrentHashMap<String, BluetoothGatt>()
+    val discoveredPeersMap = ConcurrentHashMap<String, PeerDevice>()
+    val activeGattClients = ConcurrentHashMap<String, BluetoothGatt>()
+    val serverConnectedClients = ConcurrentHashMap<String, BluetoothDevice>()
+
+    private val outboxQueues = ConcurrentHashMap<String, ConcurrentLinkedQueue<ByteArray>>()
+    private val isWriting = ConcurrentHashMap<String, Boolean>()
+    private val connectingPeers = ConcurrentHashMap<String, Boolean>()
+    private val nextPacketSeq = AtomicInteger(1)
+    private val chunkAssemblies = ConcurrentHashMap<String, ConcurrentHashMap<Int, ByteArray>>()
+    private val lastWriteTimestamp = ConcurrentHashMap<String, Long>()
+    @Volatile
+    private var latestConnectedClient: BluetoothDevice? = null
 
     var onPeerDiscovered: ((PeerDevice) -> Unit)? = null
-    var onPacketReceived: ((ByteArray) -> Unit)? = null
+    var onPacketReceived: ((packet: ByteArray, senderAddress: String?) -> Unit)? = null
 
     fun isBluetoothEnabled(): Boolean {
         val adapter = bluetoothManager?.adapter ?: bluetoothAdapter
@@ -113,8 +133,12 @@ class BleMeshManager private constructor(private val context: Context) {
             .setIncludeDeviceName(true)
             .build()
 
-        adv.startAdvertising(settings, data, scanResponse, advertiseCallback)
-        Log.i(TAG, "BLE advertising started for $deviceName")
+        try {
+            adv.startAdvertising(settings, data, scanResponse, advertiseCallback)
+            Log.i(TAG, "BLE advertising started for NetChat: $deviceName")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting advertising: ${e.message}")
+        }
     }
 
     fun stopAdvertising() {
@@ -151,9 +175,9 @@ class BleMeshManager private constructor(private val context: Context) {
             .build()
 
         try {
-            // Scan without restrictive filter so all real nearby Bluetooth devices are detected!
+            // Scan for nearby devices and filter in callback
             scn.startScan(null, settings, scanCallback)
-            Log.i(TAG, "BLE wide-area scanning started successfully")
+            Log.i(TAG, "BLE scanning started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting scan: ${e.message}")
         }
@@ -184,21 +208,48 @@ class BleMeshManager private constructor(private val context: Context) {
     private fun handleScanResult(result: ScanResult) {
         val device = result.device
         val address = device.address ?: return
-        val rawName = result.scanRecord?.deviceName ?: device.name
-        val isNetChatPeer = result.scanRecord?.serviceUuids?.any { it.uuid == SERVICE_UUID } == true
+        val scanRecord = result.scanRecord
 
-        val name = when {
-            !rawName.isNullOrBlank() -> rawName
-            isNetChatPeer -> "NetChat Peer (${address.takeLast(5)})"
-            else -> "Nearby Device (${address.takeLast(5)})"
+        // STRICT FILTER: Only show mobile devices running NetChat application!
+        // Reject TVs, smart speakers, earbuds, smartwatches, car audio, etc.
+        val pUuid = ParcelUuid(SERVICE_UUID)
+        val hasServiceUuid = scanRecord?.serviceUuids?.any { it.uuid == SERVICE_UUID } == true
+        val hasServiceData = scanRecord?.serviceData?.containsKey(pUuid) == true
+        val rawName = scanRecord?.deviceName ?: device.name ?: ""
+        val hasNetChatName = rawName.contains("NetChat", ignoreCase = true)
+
+        val isNetChatPeer = hasServiceUuid || hasServiceData || hasNetChatName
+        if (!isNetChatPeer) {
+            // Drop immediately - strictly filter out all non-NetChat devices
+            return
         }
+
+        // Also reject non-phone device classes if BluetoothClass is reported
+        val btClass = device.bluetoothClass
+        if (btClass != null) {
+            val majorClass = btClass.majorDeviceClass
+            if (majorClass == BluetoothClass.Device.Major.AUDIO_VIDEO ||
+                majorClass == BluetoothClass.Device.Major.WEARABLE ||
+                majorClass == BluetoothClass.Device.Major.PERIPHERAL
+            ) {
+                return
+            }
+        }
+
+        val cleanName = when {
+            rawName.startsWith("NetChat-", ignoreCase = true) -> rawName.removePrefix("NetChat-").trim()
+            rawName.startsWith("NetChat:", ignoreCase = true) -> rawName.removePrefix("NetChat:").trim()
+            rawName.isNotBlank() -> rawName
+            else -> "NetChat Node (${address.takeLast(5)})"
+        }
+
         val rssi = result.rssi
         val distance = estimateDistance(rssi)
         val distanceText = String.format("~ %.1f m", distance)
 
         val peer = PeerDevice(
             id = address,
-            name = if (isNetChatPeer && !name.contains("NetChat")) "$name (Mesh Node)" else name,
+            name = cleanName,
             distanceText = distanceText,
             distanceMeters = distance,
             rssi = rssi,
@@ -229,15 +280,39 @@ class BleMeshManager private constructor(private val context: Context) {
                     BluetoothGattCharacteristic.PROPERTY_NOTIFY,
                 BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
             )
+
+            // Add CCCD descriptor for client notification subscriptions
+            val cccdDescriptor = BluetoothGattDescriptor(
+                CCCD_UUID,
+                BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
+            )
+            characteristic.addDescriptor(cccdDescriptor)
+
             service.addCharacteristic(characteristic)
             gattServer?.addService(service)
-            Log.i(TAG, "GATT Server started with NetChat Mesh service")
+            Log.i(TAG, "GATT Server started with NetChat Mesh service & CCCD")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start GATT server", e)
         }
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
+        override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
+            if (device == null) return
+            val address = device.address
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.i(TAG, "GATT Server: Client connected from $address")
+                serverConnectedClients[address] = device
+                latestConnectedClient = device
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.i(TAG, "GATT Server: Client disconnected from $address")
+                serverConnectedClients.remove(address)
+                if (latestConnectedClient?.address == address) {
+                    latestConnectedClient = null
+                }
+            }
+        }
+
         override fun onCharacteristicWriteRequest(
             device: BluetoothDevice?,
             requestId: Int,
@@ -250,67 +325,326 @@ class BleMeshManager private constructor(private val context: Context) {
             if (responseNeeded) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
             }
+            if (device != null) {
+                serverConnectedClients[device.address] = device
+                latestConnectedClient = device
+            }
             value?.let { packet ->
-                Log.i(TAG, "Received packet of ${packet.size} bytes from ${device?.address}")
-                onPacketReceived?.invoke(packet)
-                try {
-                    PythonCoreBridge.processIncomingBle(packet)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error processing packet in Python core", e)
+                handleIncomingPacketBytes(packet, device?.address)
+            }
+        }
+
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice?,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor?,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            descriptor?.value = value
+            if (responseNeeded) {
+                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+            }
+            if (device != null) {
+                serverConnectedClients[device.address] = device
+                latestConnectedClient = device
+            }
+            Log.i(TAG, "GATT Server: Descriptor write request from ${device?.address}")
+        }
+    }
+
+    fun handleIncomingPacketBytes(packet: ByteArray, senderAddress: String?) {
+        if (packet.size >= 4 && packet[0] == MAGIC_CHUNK_BYTE) {
+            val seq = packet[1].toInt() and 0xFF
+            val chunkIdx = packet[2].toInt() and 0xFF
+            val totalChunks = packet[3].toInt() and 0xFF
+            val senderKey = senderAddress ?: "unknown"
+            val assemblyKey = "$senderKey-$seq-$totalChunks"
+
+            val map = chunkAssemblies.getOrPut(assemblyKey) { ConcurrentHashMap() }
+            val chunkData = packet.copyOfRange(4, packet.size)
+            map[chunkIdx] = chunkData
+
+            if (map.size == totalChunks) {
+                chunkAssemblies.remove(assemblyKey)
+                val bos = ByteArrayOutputStream()
+                for (i in 0 until totalChunks) {
+                    val part = map[i]
+                    if (part != null) {
+                        bos.write(part)
+                    }
                 }
+                val assembledBytes = bos.toByteArray()
+                Log.i(TAG, "Assembled complete packet (${assembledBytes.size} bytes) from $senderAddress")
+                onPacketReceived?.invoke(assembledBytes, senderAddress)
+            }
+            return
+        }
+
+        Log.i(TAG, "Received raw BLE packet (${packet.size} bytes) from $senderAddress")
+        onPacketReceived?.invoke(packet, senderAddress)
+    }
+
+    fun sendPayloadToPeer(peerAddress: String, payload: ByteArray) {
+        if (!BluetoothAdapter.checkBluetoothAddress(peerAddress)) {
+            Log.w(TAG, "sendPayloadToPeer: invalid Bluetooth address '$peerAddress'")
+            return
+        }
+        if (payload.size <= 20 && payload.firstOrNull() != MAGIC_CHUNK_BYTE) {
+            enqueueRawPacket(peerAddress, payload)
+        } else {
+            val seq = (nextPacketSeq.getAndIncrement() and 0xFF).toByte()
+            val totalChunks = ((payload.size + MAX_CHUNK_PAYLOAD - 1) / MAX_CHUNK_PAYLOAD)
+            if (totalChunks > 255) {
+                Log.e(TAG, "Payload too large to chunk: ${payload.size} bytes")
+                return
+            }
+            for (i in 0 until totalChunks) {
+                val offset = i * MAX_CHUNK_PAYLOAD
+                val len = minOf(MAX_CHUNK_PAYLOAD, payload.size - offset)
+                val chunk = ByteArray(4 + len)
+                chunk[0] = MAGIC_CHUNK_BYTE
+                chunk[1] = seq
+                chunk[2] = i.toByte()
+                chunk[3] = totalChunks.toByte()
+                System.arraycopy(payload, offset, chunk, 4, len)
+                enqueueRawPacket(peerAddress, chunk)
             }
         }
     }
 
-    fun sendPayloadToPeer(peerAddress: String, payload: ByteArray) {
-        val device = bluetoothAdapter?.getRemoteDevice(peerAddress) ?: return
-        val existingGatt = activeConnections[peerAddress]
+    private fun enqueueRawPacket(peerAddress: String, rawPacket: ByteArray) {
+        val queue = outboxQueues.getOrPut(peerAddress) { ConcurrentLinkedQueue() }
+        queue.add(rawPacket)
+        processOutbox(peerAddress)
+    }
 
+    private fun processOutbox(peerAddress: String) {
+        val queue = outboxQueues[peerAddress] ?: return
+        if (queue.isEmpty()) return
+
+        // 1. If we have an active GATT client connection to this peer, write to it
+        val existingGatt = activeGattClients[peerAddress]
         if (existingGatt != null) {
-            writeCharacteristic(existingGatt, payload)
-        } else {
-            device.connectGatt(context, false, object : BluetoothGattCallback() {
-                override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
-                    if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        Log.i(TAG, "Connected to GATT peer $peerAddress, requesting MTU 512")
-                        gatt?.requestMtu(512)
-                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        activeConnections.remove(peerAddress)
-                        gatt?.close()
-                    }
+            val lastWrite = lastWriteTimestamp[peerAddress] ?: 0L
+            if (isWriting[peerAddress] == true) {
+                if (System.currentTimeMillis() - lastWrite > 800L) {
+                    isWriting[peerAddress] = false
+                } else {
+                    return
+                }
+            }
+            val nextPacket = queue.peek() ?: return
+            lastWriteTimestamp[peerAddress] = System.currentTimeMillis()
+            isWriting[peerAddress] = true
+            if (writeCharacteristic(existingGatt, nextPacket)) {
+                queue.poll()
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    isWriting[peerAddress] = false
+                    processOutbox(peerAddress)
+                }, 25)
+            } else {
+                isWriting[peerAddress] = false
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    processOutbox(peerAddress)
+                }, 50)
+            }
+            return
+        }
+
+        // 2. If peer is connected to our GATT Server as a client, notify the client
+        val serverClient = serverConnectedClients[peerAddress] ?: latestConnectedClient
+        if (serverClient != null && gattServer != null) {
+            val service = gattServer?.getService(SERVICE_UUID)
+            val characteristic = service?.getCharacteristic(CHARACTERISTIC_UUID)
+            if (characteristic != null) {
+                val nextPacket = queue.poll() ?: return
+                notifyClient(serverClient, characteristic, nextPacket)
+                if (!queue.isEmpty()) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        processOutbox(peerAddress)
+                    }, 25)
+                }
+                return
+            }
+        }
+
+        // 3. Neither client nor server connection is currently ready - connect via LE
+        connectToPeer(peerAddress)
+    }
+
+    private fun connectToPeer(peerAddress: String) {
+        if (!BluetoothAdapter.checkBluetoothAddress(peerAddress)) {
+            Log.w(TAG, "connectToPeer: invalid Bluetooth address '$peerAddress'")
+            return
+        }
+        if (connectingPeers[peerAddress] == true) {
+            Log.d(TAG, "Already connecting to $peerAddress, skipping duplicate connectGatt")
+            return
+        }
+        val device = bluetoothAdapter?.getRemoteDevice(peerAddress) ?: return
+        connectingPeers[peerAddress] = true
+
+        // Stop scanning to preserve radio bandwidth during connection establishment
+        try {
+            stopScanning()
+        } catch (_: Exception) {}
+
+        Log.i(TAG, "Connecting GATT client to peer $peerAddress with TRANSPORT_LE")
+        device.connectGatt(context, false, createGattCallback(peerAddress), BluetoothDevice.TRANSPORT_LE)
+    }
+
+    private fun createGattCallback(peerAddress: String) = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+            connectingPeers.remove(peerAddress)
+            if (newState == BluetoothProfile.STATE_CONNECTED && gatt != null && status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i(TAG, "Connected to GATT peer $peerAddress, discovering services")
+                isWriting[peerAddress] = false
+                gatt.discoverServices()
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED || status != BluetoothGatt.GATT_SUCCESS) {
+                Log.w(TAG, "Disconnected or connection error with GATT peer $peerAddress (status: $status)")
+                activeGattClients.remove(peerAddress)
+                isWriting.remove(peerAddress)
+                try {
+                    gatt?.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing GATT", e)
                 }
 
-                override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
-                    gatt?.discoverServices()
+                // If outbox still has unsent messages, schedule reconnect retry after 1s
+                val queue = outboxQueues[peerAddress]
+                if (queue != null && !queue.isEmpty()) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        connectToPeer(peerAddress)
+                    }, 1000)
                 }
+            }
+        }
 
-                override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-                    if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
-                        activeConnections[peerAddress] = gatt
-                        writeCharacteristic(gatt, payload)
+        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
+                Log.i(TAG, "Services discovered for $peerAddress")
+                val service = gatt.getService(SERVICE_UUID)
+                val characteristic = service?.getCharacteristic(CHARACTERISTIC_UUID)
+                if (characteristic != null) {
+                    activeGattClients[peerAddress] = gatt
+                    isWriting[peerAddress] = false
+
+                    // Subscribe to notifications for incoming packets
+                    val subSuccess = try {
+                        subscribeToNotifications(gatt)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Subscribe notification failed: ${e.message}")
+                        false
                     }
+
+                    if (!subSuccess) {
+                        processOutbox(peerAddress)
+                    }
+                } else {
+                    Log.w(TAG, "Required service/characteristic not found on $peerAddress")
                 }
-            })
+            }
+        }
+
+        override fun onDescriptorWrite(
+            gatt: BluetoothGatt?,
+            descriptor: BluetoothGattDescriptor?,
+            status: Int
+        ) {
+            Log.i(TAG, "onDescriptorWrite for $peerAddress, status: $status")
+            isWriting[peerAddress] = false
+            processOutbox(peerAddress)
+        }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?,
+            status: Int
+        ) {
+            isWriting[peerAddress] = false
+            Log.d(TAG, "Characteristic write completed for $peerAddress with status: $status")
+            processOutbox(peerAddress)
+        }
+
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray
+        ) {
+            handleIncomingPacketBytes(value, gatt.device.address)
+        }
+
+        @Suppress("DEPRECATION")
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?
+        ) {
+            characteristic?.value?.let { value ->
+                handleIncomingPacketBytes(value, gatt?.device?.address)
+            }
         }
     }
 
-    private fun writeCharacteristic(gatt: BluetoothGatt, data: ByteArray) {
-        val service = gatt.getService(SERVICE_UUID) ?: return
-        val characteristic = service.getCharacteristic(CHARACTERISTIC_UUID) ?: return
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+    private fun subscribeToNotifications(gatt: BluetoothGatt): Boolean {
+        val service = gatt.getService(SERVICE_UUID) ?: return false
+        val characteristic = service.getCharacteristic(CHARACTERISTIC_UUID) ?: return false
+        gatt.setCharacteristicNotification(characteristic, true)
+
+        val descriptor = characteristic.getDescriptor(CCCD_UUID) ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothStatusCodes.SUCCESS
+        } else {
+            @Suppress("DEPRECATION")
+            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            @Suppress("DEPRECATION")
+            gatt.writeDescriptor(descriptor)
+        }
+    }
+
+    private fun writeCharacteristic(gatt: BluetoothGatt, data: ByteArray): Boolean {
+        val service = gatt.getService(SERVICE_UUID) ?: return false
+        val characteristic = service.getCharacteristic(CHARACTERISTIC_UUID) ?: return false
+
+        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val res = gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+            res == BluetoothStatusCodes.SUCCESS
         } else {
             @Suppress("DEPRECATION")
             characteristic.value = data
             @Suppress("DEPRECATION")
-            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             @Suppress("DEPRECATION")
             gatt.writeCharacteristic(characteristic)
         }
     }
 
+    private fun notifyClient(
+        clientDevice: BluetoothDevice,
+        characteristic: BluetoothGattCharacteristic,
+        data: ByteArray
+    ) {
+        val server = gattServer ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            server.notifyCharacteristicChanged(clientDevice, characteristic, false, data)
+        } else {
+            @Suppress("DEPRECATION")
+            characteristic.value = data
+            @Suppress("DEPRECATION")
+            server.notifyCharacteristicChanged(clientDevice, characteristic, false)
+        }
+    }
+
     fun broadcastPacket(payload: ByteArray) {
-        discoveredPeersMap.keys.forEach { addr ->
+        val allTargetAddresses = mutableSetOf<String>()
+        allTargetAddresses.addAll(discoveredPeersMap.keys)
+        allTargetAddresses.addAll(activeGattClients.keys)
+        allTargetAddresses.addAll(serverConnectedClients.keys)
+
+        allTargetAddresses.forEach { addr ->
             sendPayloadToPeer(addr, payload)
         }
     }

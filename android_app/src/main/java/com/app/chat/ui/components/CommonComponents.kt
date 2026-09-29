@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,9 +44,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.chat.model.NavigationTab
@@ -189,10 +196,10 @@ fun MessageInputField(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .height(44.dp)
+                .defaultMinSize(minHeight = 44.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(SurfaceDark)
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.weight(1f)) {
@@ -204,6 +211,7 @@ fun MessageInputField(
                     onValueChange = onTextChange,
                     textStyle = TextStyle(color = TextPrimary, fontSize = 14.sp),
                     cursorBrush = SolidColor(PrimaryBlue),
+                    maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -320,8 +328,20 @@ fun VoiceMessageBar(
 @Composable
 fun ImagePreviewCard(
     imageLabel: String = "Encrypted Media",
+    thumbnailBase64: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val bitmap = remember(thumbnailBase64) {
+        if (!thumbnailBase64.isNullOrBlank()) {
+            try {
+                val bytes = android.util.Base64.decode(thumbnailBase64, android.util.Base64.DEFAULT)
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
     Column(
         modifier = modifier
             .width(210.dp)
@@ -332,15 +352,31 @@ fun ImagePreviewCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(112.dp)
+                .height(130.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(ImageContainerBg),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("📷", fontSize = 24.sp)
-                Spacer(Modifier.height(4.dp))
-                Text(imageLabel, color = TextSecondary, fontSize = 11.sp)
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = imageLabel,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("📷", fontSize = 26.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        imageLabel,
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }

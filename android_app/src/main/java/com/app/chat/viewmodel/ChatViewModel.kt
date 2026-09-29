@@ -1,5 +1,11 @@
 package com.app.chat.viewmodel
 
+import android.bluetooth.BluetoothAdapter
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -19,8 +25,11 @@ import com.app.chat.model.PeerDevice
 import com.app.chat.model.Screen
 import com.app.chat.model.StorageStats
 import com.app.chat.model.UserProfile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,6 +84,8 @@ class ChatViewModel : ViewModel() {
     val selectedGroupPeerIds = mutableStateListOf<String>()
     var newGroupName by mutableStateOf("")
 
+    val peerAddressMap = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     var bleMeshManager: BleMeshManager? = null
         private set
 
@@ -119,8 +130,8 @@ class ChatViewModel : ViewModel() {
             }
         }
 
-        manager.onPacketReceived = { packet ->
-            handleIncomingPacket(packet)
+        manager.onPacketReceived = { packet, senderAddress ->
+            handleIncomingPacket(packet, senderAddress)
         }
     }
 
@@ -133,28 +144,54 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun handleIncomingPacket(packet: ByteArray) {
+    private fun handleIncomingPacket(packet: ByteArray, senderAddress: String?) {
         try {
             val result = PythonCoreBridge.processIncomingBle(packet) ?: return
             val code = (result["code"] as? Number)?.toInt() ?: -1
             if (code != 0) return
 
             val packetType = (result["packet_type"] as? Number)?.toInt()
+            val senderId = result["sender_id"]?.toString() ?: senderAddress ?: "unknown"
+
+            if (senderAddress != null && senderId != "unknown") {
+                peerAddressMap[senderId] = senderAddress
+                peerAddressMap[senderAddress] = senderId
+            }
+
             if (packetType == 1) { // MESSAGE
                 val msgId = result["msg_id"]?.toString() ?: UUID.randomUUID().toString()
-                val senderId = result["sender_id"]?.toString() ?: "unknown"
                 val messageText = result["message"]?.toString() ?: ""
                 val timestamp = getCurrentTime()
 
+                val isVoice = messageText.startsWith("[VOICE:") && messageText.endsWith("]")
+                val isImage = messageText.startsWith("[IMG:") && messageText.endsWith("]")
+
+                val mediaType = when {
+                    isVoice -> MediaType.Voice
+                    isImage -> MediaType.Image
+                    else -> MediaType.Text
+                }
+                val mediaDuration = if (isVoice) messageText.removePrefix("[VOICE:").removeSuffix("]").trim() else null
+                val mediaThumbnail = if (isImage) messageText.removePrefix("[IMG:").removeSuffix("]").trim() else null
+                val displaySummary = when {
+                    isVoice -> "🎙 Voice message ($mediaDuration)"
+                    isImage -> "📷 Photo"
+                    else -> messageText
+                }
+
                 viewModelScope.launch {
                     val convId = "chat-$senderId"
-                    val existingConv = conversations.find { it.id == convId }
+                    val existingConv = conversations.find { it.id == convId || (senderAddress != null && it.id == "chat-$senderAddress") }
+                    val targetConvId = existingConv?.id ?: convId
+                    val peerName = nearbyPeers.find { it.id == senderId || it.id == senderAddress }?.name
+                        ?: bleMeshManager?.discoveredPeersMap?.get(senderAddress)?.name
+                        ?: "Peer ${senderId.take(6)}"
+
                     if (existingConv == null) {
-                        val peerName = nearbyPeers.find { it.id == senderId }?.name ?: "Peer ${senderId.take(6)}"
                         val newConv = ChatConversation(
-                            id = convId,
+                            id = targetConvId,
                             name = peerName,
-                            lastMessage = messageText,
+                            lastMessage = displaySummary,
                             lastTimestamp = "Just now",
                             unreadCount = 1,
                             isGroup = false,
@@ -166,28 +203,42 @@ class ChatViewModel : ViewModel() {
                         val idx = conversations.indexOf(existingConv)
                         conversations.removeAt(idx)
                         conversations.add(0, existingConv.copy(
-                            lastMessage = messageText,
+                            lastMessage = displaySummary,
                             lastTimestamp = "Just now",
-                            unreadCount = if (activeConversationId == convId) 0 else existingConv.unreadCount + 1
+                            unreadCount = if (activeConversationId == targetConvId) 0 else existingConv.unreadCount + 1
                         ))
                     }
 
-                    val list = messagesMap.getOrPut(convId) { mutableStateListOf() }
+                    val list = messagesMap.getOrPut(targetConvId) { mutableStateListOf() }
                     list.add(
                         MessageItem(
                             id = msgId,
-                            conversationId = convId,
+                            conversationId = targetConvId,
                             senderId = senderId,
-                            senderName = conversations.find { it.id == convId }?.name ?: "Peer",
-                            text = messageText,
+                            senderName = peerName,
+                            text = if (mediaType == MediaType.Image) "Photo" else displaySummary,
                             timestamp = timestamp,
                             isIncoming = true,
-                            status = MessageStatus.Delivered
+                            status = MessageStatus.Delivered,
+                            mediaType = mediaType,
+                            mediaDuration = mediaDuration,
+                            mediaThumbnail = mediaThumbnail
                         )
                     )
                 }
             } else {
-                // Handshake processed: update peers
+                // Handshake processed: reply with handshake so both devices share keys!
+                Log.i("ChatViewModel", "Handshake received from $senderId, sending handshake reply")
+                val replyHex = PythonCoreBridge.prepareHandshakePacket()
+                if (replyHex != null) {
+                    val replyBytes = hexStringToByteArray(replyHex)
+                    if (senderAddress != null) {
+                        bleMeshManager?.sendPayloadToPeer(senderAddress, replyBytes)
+                    } else {
+                        bleMeshManager?.broadcastPacket(replyBytes)
+                    }
+                }
+
                 viewModelScope.launch {
                     val backendPeers = PythonCoreBridge.getPeers()
                     if (backendPeers.isNotEmpty()) {
@@ -196,7 +247,7 @@ class ChatViewModel : ViewModel() {
                             val name = p["name"]?.toString() ?: "Mesh Peer"
                             val dist = p["distance"]?.toString() ?: "~ 5 m"
                             val rssi = (p["rssi"] as? Number)?.toInt() ?: -60
-                            val existing = nearbyPeers.find { it.id == id }
+                            val existing = nearbyPeers.find { it.id == id || (senderAddress != null && it.id == senderAddress) }
                             if (existing == null) {
                                 nearbyPeers.add(PeerDevice(id = id, name = name, distanceText = dist, distanceMeters = 5f, rssi = rssi))
                             }
@@ -386,7 +437,7 @@ class ChatViewModel : ViewModel() {
             val newConv = ChatConversation(
                 id = "chat-${peer.id}",
                 name = peer.name,
-                lastMessage = "Direct mesh connection established",
+                lastMessage = "",
                 lastTimestamp = "Just now",
                 unreadCount = 0,
                 isGroup = false,
@@ -394,17 +445,7 @@ class ChatViewModel : ViewModel() {
                 isOnline = true
             )
             conversations.add(0, newConv)
-            messagesMap[newConv.id] = mutableStateListOf(
-                MessageItem(
-                    id = UUID.randomUUID().toString(),
-                    conversationId = newConv.id,
-                    senderId = peer.id,
-                    senderName = peer.name,
-                    text = "Connected via direct Bluetooth mesh. You can chat offline now!",
-                    timestamp = getCurrentTime(),
-                    isIncoming = true
-                )
-            )
+            messagesMap[newConv.id] = mutableStateListOf()
             openConversation(newConv.id)
         }
 
@@ -419,23 +460,60 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    private fun sendRawPayload(rawText: String, convId: String): Boolean {
+        val rawTarget = conversations.find { it.id == convId }?.id?.removePrefix("chat-") ?: convId
+        val targetPeerId = peerAddressMap[rawTarget] ?: rawTarget
+
+        var packetHex = PythonCoreBridge.prepareOutgoingMessage(targetPeerId, rawText)
+        if (packetHex == null && rawTarget != targetPeerId) {
+            packetHex = PythonCoreBridge.prepareOutgoingMessage(rawTarget, rawText)
+        }
+
+        val bleTargetAddress = when {
+            BluetoothAdapter.checkBluetoothAddress(rawTarget) -> rawTarget
+            BluetoothAdapter.checkBluetoothAddress(targetPeerId) -> targetPeerId
+            else -> peerAddressMap[rawTarget] ?: peerAddressMap[targetPeerId]
+        }
+
+        // If packetHex is still null, exchange handshake first and retry
+        if (packetHex == null) {
+            val handshakeHex = PythonCoreBridge.prepareHandshakePacket()
+            if (handshakeHex != null) {
+                val handshakeBytes = hexStringToByteArray(handshakeHex)
+                if (bleTargetAddress != null && BluetoothAdapter.checkBluetoothAddress(bleTargetAddress)) {
+                    bleMeshManager?.sendPayloadToPeer(bleTargetAddress, handshakeBytes)
+                } else {
+                    bleMeshManager?.broadcastPacket(handshakeBytes)
+                }
+            }
+            packetHex = PythonCoreBridge.prepareOutgoingMessage(targetPeerId, rawText)
+                ?: PythonCoreBridge.prepareOutgoingMessage(rawTarget, rawText)
+        }
+
+        var isTransmitted = false
+        if (packetHex != null) {
+            try {
+                val packetBytes = hexStringToByteArray(packetHex)
+                if (bleTargetAddress != null && BluetoothAdapter.checkBluetoothAddress(bleTargetAddress)) {
+                    bleMeshManager?.sendPayloadToPeer(bleTargetAddress, packetBytes)
+                } else {
+                    bleMeshManager?.broadcastPacket(packetBytes)
+                }
+                isTransmitted = true
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Error transmitting packet: ${e.message}")
+            }
+        }
+        return isTransmitted
+    }
+
     fun sendMessage(text: String) {
         if (text.isBlank() || activeConversationId == null) return
         val convId = activeConversationId!!
         val timestamp = getCurrentTime()
         val msgId = UUID.randomUUID().toString()
 
-        val targetPeerId = conversations.find { it.id == convId }?.id?.removePrefix("chat-") ?: convId
-        val packetHex = PythonCoreBridge.prepareOutgoingMessage(targetPeerId, text)
-        if (packetHex != null) {
-            try {
-                val packetBytes = hexStringToByteArray(packetHex)
-                bleMeshManager?.sendPayloadToPeer(targetPeerId, packetBytes)
-                bleMeshManager?.broadcastPacket(packetBytes)
-            } catch (e: Exception) {
-                Log.e("ChatViewModel", "Error broadcasting packet: ${e.message}")
-            }
-        }
+        val isTransmitted = sendRawPayload(text, convId)
 
         val sendingMessage = MessageItem(
             id = msgId,
@@ -445,7 +523,7 @@ class ChatViewModel : ViewModel() {
             text = text,
             timestamp = timestamp,
             isIncoming = false,
-            status = MessageStatus.Sending,
+            status = if (isTransmitted) MessageStatus.Sent else MessageStatus.Sending,
             mediaType = MediaType.Text
         )
 
@@ -457,14 +535,6 @@ class ChatViewModel : ViewModel() {
             val oldConv = conversations[convIndex]
             conversations.removeAt(convIndex)
             conversations.add(0, oldConv.copy(lastMessage = text, lastTimestamp = "Just now"))
-        }
-
-        viewModelScope.launch {
-            delay(150)
-            val idx = list.indexOfFirst { it.id == msgId }
-            if (idx >= 0) {
-                list[idx] = list[idx].copy(status = MessageStatus.Sent)
-            }
         }
     }
 
@@ -478,32 +548,62 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun sendImageMessage(caption: String = "Shared photo from camera") {
+    fun sendImageMedia(uri: Uri, context: Context) {
         val convId = activeConversationId ?: return
-        val timestamp = getCurrentTime()
-        val msgId = UUID.randomUUID().toString()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val originalBitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
 
-        val imageMsg = MessageItem(
-            id = msgId,
-            conversationId = convId,
-            senderId = userProfile.id,
-            senderName = userProfile.displayName,
-            text = caption,
-            timestamp = timestamp,
-            isIncoming = false,
-            status = MessageStatus.Delivered,
-            mediaType = MediaType.Image,
-            mediaThumbnail = "photo_sample"
-        )
-        messagesMap.getOrPut(convId) { mutableStateListOf() }.add(imageMsg)
+                if (originalBitmap == null) {
+                    Log.e("ChatViewModel", "Failed to decode image from uri: $uri")
+                    return@launch
+                }
 
-        val convIndex = conversations.indexOfFirst { it.id == convId }
-        if (convIndex >= 0) {
-            val oldConv = conversations[convIndex]
-            conversations.removeAt(convIndex)
-            conversations.add(0, oldConv.copy(lastMessage = "📷 Image: $caption", lastTimestamp = "Just now"))
+                // Downscale to compact thumbnail for fast peer-to-peer BLE transmission
+                val maxDim = 48
+                val ratio = minOf(maxDim.toFloat() / originalBitmap.width, maxDim.toFloat() / originalBitmap.height, 1.0f)
+                val targetW = maxOf(1, (originalBitmap.width * ratio).toInt())
+                val targetH = maxOf(1, (originalBitmap.height * ratio).toInt())
+                val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, targetW, targetH, true)
+
+                val outStream = ByteArrayOutputStream()
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 35, outStream)
+                val compressedBytes = outStream.toByteArray()
+                val b64 = Base64.encodeToString(compressedBytes, Base64.NO_WRAP)
+
+                val imgPayload = "[IMG:$b64]"
+                val isTransmitted = sendRawPayload(imgPayload, convId)
+
+                withContext(Dispatchers.Main) {
+                    val timestamp = getCurrentTime()
+                    val msgId = UUID.randomUUID().toString()
+                    val imageMsg = MessageItem(
+                        id = msgId,
+                        conversationId = convId,
+                        senderId = userProfile.id,
+                        senderName = userProfile.displayName,
+                        text = "Photo",
+                        timestamp = timestamp,
+                        isIncoming = false,
+                        status = if (isTransmitted) MessageStatus.Sent else MessageStatus.Sending,
+                        mediaType = MediaType.Image,
+                        mediaThumbnail = b64
+                    )
+                    messagesMap.getOrPut(convId) { mutableStateListOf() }.add(imageMsg)
+
+                    val convIndex = conversations.indexOfFirst { it.id == convId }
+                    if (convIndex >= 0) {
+                        val oldConv = conversations[convIndex]
+                        conversations.removeAt(convIndex)
+                        conversations.add(0, oldConv.copy(lastMessage = "📷 Photo", lastTimestamp = "Just now"))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Error sending image: ${e.message}", e)
+            }
         }
-        showAttachmentDialog = false
     }
 
     fun toggleVoiceRecording() {
@@ -514,6 +614,9 @@ class ChatViewModel : ViewModel() {
             voiceRecordDurationSeconds = 0
 
             val convId = activeConversationId ?: return
+            val voicePayload = "[VOICE:$durationStr]"
+            val isTransmitted = sendRawPayload(voicePayload, convId)
+
             val voiceMsg = MessageItem(
                 id = UUID.randomUUID().toString(),
                 conversationId = convId,
@@ -522,7 +625,7 @@ class ChatViewModel : ViewModel() {
                 text = "Voice message ($durationStr)",
                 timestamp = getCurrentTime(),
                 isIncoming = false,
-                status = MessageStatus.Delivered,
+                status = if (isTransmitted) MessageStatus.Sent else MessageStatus.Sending,
                 mediaType = MediaType.Voice,
                 mediaDuration = durationStr
             )

@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -65,27 +66,29 @@ class MainActivity : ComponentActivity() {
 
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    background = BackgroundDark,
-                    surface = SurfaceDark,
-                    primary = PrimaryBlue,
-                    onBackground = TextPrimary,
-                    onSurface = TextPrimary,
-                    onPrimary = Color.White
-                )
+            val originalDensity = androidx.compose.ui.platform.LocalDensity.current
+            val clampedDensity = androidx.compose.ui.unit.Density(
+                density = originalDensity.density,
+                fontScale = originalDensity.fontScale.coerceIn(0.85f, 1.05f)
+            )
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides clampedDensity
             ) {
-                AppRoot(viewModel = viewModel)
+                MaterialTheme(
+                    colorScheme = darkColorScheme(
+                        background = BackgroundDark,
+                        surface = SurfaceDark,
+                        primary = PrimaryBlue,
+                        onBackground = TextPrimary,
+                        onSurface = TextPrimary,
+                        onPrimary = Color.White
+                    )
+                ) {
+                    AppRoot(viewModel = viewModel)
+                }
             }
         }
     }
