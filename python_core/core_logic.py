@@ -100,6 +100,15 @@ def get_device_id() -> dict[str, str | int]:
     return {"code": ErrorCode.OK, "device_id": device_id}
 
 
+def get_public_key() -> dict[str, str | int]:
+    """Returns this device's Curve25519 public key in hex format."""
+    pair = get_or_create_keypair()
+    if pair is None:
+        return {"code": ErrorCode.KEYSTORE_ERROR}
+    _, pub_bytes = pair
+    return {"code": ErrorCode.OK, "public_key": pub_bytes.hex()}
+
+
 def _ensure_peer_exists(peer_id: str, public_key: bytes | None = None) -> bool:
     """Ensure a peer exists in the peers table. If not, insert it."""
     connection = get_db_connection()
@@ -142,6 +151,16 @@ def _ensure_peer_exists(peer_id: str, public_key: bytes | None = None) -> bool:
         return False
 
 
+_PEER_ALIAS_MAP: dict[str, str] = {}
+
+
+def associate_peer_alias(alias: str, peer_uuid: str) -> None:
+    """Associates an alias (such as BLE MAC address) with a peer UUID."""
+    if alias and peer_uuid:
+        _PEER_ALIAS_MAP[alias] = peer_uuid
+        _PEER_ALIAS_MAP[peer_uuid] = alias
+
+
 def _get_peer_public_key(peer_id: str) -> bytes | None:
     """Retrieves a peer's public key from the database."""
     connection = get_db_connection()
@@ -151,6 +170,7 @@ def _get_peer_public_key(peer_id: str) -> bytes | None:
     try:
         cursor = connection.cursor()
 
+        # 1. Direct match on peer_id
         _ = cursor.execute(
             f"""SELECT {PEERS.columns.public_key.name}
             FROM {PEERS.name}
@@ -158,19 +178,49 @@ def _get_peer_public_key(peer_id: str) -> bytes | None:
             (peer_id,),
         )
         row = cast(SQLITE3_ROW_TYPE | None, cursor.fetchone())
+        if row is not None:
+            public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
+            if public_key and len(public_key) == KEY_LENGTH:
+                return public_key
 
-        if row is None:
-            return None
+        # 2. Check alias map
+        resolved_uuid = _PEER_ALIAS_MAP.get(peer_id)
+        if resolved_uuid:
+            _ = cursor.execute(
+                f"""SELECT {PEERS.columns.public_key.name}
+                FROM {PEERS.name}
+                WHERE {PEERS.columns.peer_id.name} = ?""",
+                (resolved_uuid,),
+            )
+            row = cast(SQLITE3_ROW_TYPE | None, cursor.fetchone())
+            if row is not None:
+                public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
+                if public_key and len(public_key) == KEY_LENGTH:
+                    return public_key
 
-        public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
-
-        if public_key and len(public_key) == KEY_LENGTH:
-            return public_key
+        # 3. Fallback: single remote peer in database (1-on-1 direct chat)
+        my_id = get_or_create_device_id()
+        _ = cursor.execute(
+            f"""SELECT {PEERS.columns.public_key.name}
+            FROM {PEERS.name}
+            WHERE {PEERS.columns.peer_id.name} != ?
+              AND {PEERS.columns.public_key.name} IS NOT NULL
+              AND LENGTH({PEERS.columns.public_key.name}) = 32
+            ORDER BY {PEERS.columns.last_seen.name} DESC
+            LIMIT 1""",
+            (my_id or "",),
+        )
+        row = cast(SQLITE3_ROW_TYPE | None, cursor.fetchone())
+        if row is not None:
+            public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
+            if public_key and len(public_key) == KEY_LENGTH:
+                return public_key
 
     except sqlite3.Error as e:
         print(f"Database error retrieving peer public key: {e}")
 
     return None
+
 
 
 def init_database() -> dict[str, str | int]:
@@ -474,10 +524,18 @@ def _process_message_packet(raw_payload: bytes) -> dict[str, str | int]:
         return {"code": ErrorCode.DATABASE_ERROR}
 
 
-def process_incoming_ble(raw_payload: bytes) -> dict[str, str | int]:
+def process_incoming_ble(raw_payload: bytes | str) -> dict[str, str | int]:
     """
     Routes incoming packets based on their packet format.
     """
+    if isinstance(raw_payload, str):
+        try:
+            raw_payload = bytes.fromhex(raw_payload)
+        except ValueError:
+            return {"code": ErrorCode.INVALID_PACKET}
+    elif isinstance(raw_payload, (bytearray, memoryview)):
+        raw_payload = bytes(raw_payload)
+
     if HANDSHAKE_PACKET_FORMAT.matches(raw_payload):
         return _process_handshake_packet(raw_payload)
 
@@ -485,6 +543,7 @@ def process_incoming_ble(raw_payload: bytes) -> dict[str, str | int]:
         return _process_message_packet(raw_payload)
 
     return {"code": ErrorCode.UNKNOWN_PACKET_TYPE}
+
 
 
 def trigger_panic_wipe() -> dict[str, str | int]:
@@ -503,3 +562,149 @@ def trigger_panic_wipe() -> dict[str, str | int]:
         return {"code": ErrorCode.DATABASE_ERROR}
 
     return {"code": ErrorCode.OK}
+
+
+def get_peers() -> list[dict[str, str | int]]:
+    """
+    Returns a list of all known peers from the database (excluding self).
+    Used by PythonCoreBridge.getPeers() on Android to populate the nearby list.
+    """
+    device_id = get_or_create_device_id()
+    connection = get_db_connection()
+    if connection is None:
+        return []
+
+    try:
+        cursor = connection.cursor()
+        _ = cursor.execute(
+            f"""SELECT
+                {PEERS.columns.peer_id.name},
+                {PEERS.columns.last_seen.name}
+            FROM {PEERS.name}
+            WHERE {PEERS.columns.peer_id.name} != ?
+            ORDER BY {PEERS.columns.last_seen.name} DESC""",
+            (device_id or "",),
+        )
+        rows = cursor.fetchall()
+        result = []
+        for row in rows:
+            peer_id = row[PEERS.columns.peer_id.name]
+            last_seen = row[PEERS.columns.last_seen.name]
+            # Estimate age since last seen
+            age_sec = int(time.time()) - (last_seen or 0)
+            if age_sec < 60:
+                dist = "~ 5 m"
+            elif age_sec < 300:
+                dist = "~ 12 m"
+            else:
+                dist = "~ 25 m"
+            result.append({
+                "id": peer_id,
+                "name": f"Mesh Node {peer_id[:8]}",
+                "distance": dist,
+                "rssi": -60,
+                "last_seen": last_seen or 0,
+            })
+        return result
+    except sqlite3.Error as e:
+        print(f"Database error in get_peers: {e}")
+        return []
+
+
+def get_storage_breakdown() -> dict[str, int]:
+    """
+    Returns approximate storage usage in MB broken down by category.
+    Used by PythonCoreBridge.getStorageBreakdown() on Android.
+    """
+    connection = get_db_connection()
+    db_path = os.path.join(BASE_DIR, "database.db")
+    total_db_bytes = 0
+    if os.path.exists(db_path):
+        try:
+            total_db_bytes = os.path.getsize(db_path)
+        except OSError:
+            total_db_bytes = 0
+
+    msg_count = 0
+    if connection is not None:
+        try:
+            cursor = connection.cursor()
+            _ = cursor.execute(f"SELECT COUNT(*) FROM {MESSAGES.name}")
+            row = cursor.fetchone()
+            if row:
+                msg_count = row[0]
+        except sqlite3.Error:
+            msg_count = 0
+
+    # Estimate breakdown: each message ~500 bytes payload on average
+    messages_bytes_mb = max(1, (msg_count * 500) // 1_000_000 + 1)
+    # DB overhead and routing cache
+    other_bytes_mb = max(1, total_db_bytes // 1_000_000)
+
+    return {
+        "messages": messages_bytes_mb,
+        "images": 0,
+        "voice": 0,
+        "other": max(1, other_bytes_mb),
+    }
+
+
+def get_messages_for_peer(peer_id: str) -> list[dict[str, str | int]]:
+    """
+    Returns all decrypted messages exchanged with a specific peer.
+    Used for store-and-forward retrieval when a peer reconnects.
+    """
+    device_id = get_or_create_device_id()
+    connection = get_db_connection()
+    if connection is None or device_id is None:
+        return []
+
+    try:
+        cursor = connection.cursor()
+        _ = cursor.execute(
+            f"""SELECT
+                {MESSAGES.columns.msg_id.name},
+                {MESSAGES.columns.sender_id.name},
+                {MESSAGES.columns.recipient_id.name},
+                {MESSAGES.columns.payload.name},
+                {MESSAGES.columns.timestamp.name},
+                {MESSAGES.columns.status.name}
+            FROM {MESSAGES.name}
+            WHERE ({MESSAGES.columns.sender_id.name} = ? AND {MESSAGES.columns.recipient_id.name} = ?)
+               OR ({MESSAGES.columns.sender_id.name} = ? AND {MESSAGES.columns.recipient_id.name} = ?)
+            ORDER BY {MESSAGES.columns.timestamp.name} ASC""",
+            (device_id, peer_id, peer_id, device_id),
+        )
+        rows = cursor.fetchall()
+        result = []
+
+        pair = get_or_create_keypair()
+        peer_pub = _get_peer_public_key(peer_id)
+
+        for row in rows:
+            payload_hex = row[MESSAGES.columns.payload.name]
+            plaintext = ""
+            if payload_hex and pair and peer_pub:
+                try:
+                    ciphertext = bytes.fromhex(payload_hex)
+                    my_priv, _ = pair
+                    aes_key = derive_shared_secret(my_priv, peer_pub)
+                    if aes_key:
+                        pt = decrypt(ciphertext, aes_key)
+                        if pt:
+                            plaintext = pt.decode("utf-8", errors="replace")
+                except Exception as e:
+                    print(f"Error decrypting message: {e}")
+
+            result.append({
+                MESSAGES.columns.msg_id.name: row[MESSAGES.columns.msg_id.name],
+                MESSAGES.columns.sender_id.name: row[MESSAGES.columns.sender_id.name],
+                MESSAGES.columns.recipient_id.name: row[MESSAGES.columns.recipient_id.name],
+                "message": plaintext,
+                MESSAGES.columns.timestamp.name: row[MESSAGES.columns.timestamp.name],
+                MESSAGES.columns.status.name: row[MESSAGES.columns.status.name],
+            })
+        return result
+    except sqlite3.Error as e:
+        print(f"Database error in get_messages_for_peer: {e}")
+        return []

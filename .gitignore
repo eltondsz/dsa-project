@@ -1,23 +1,56 @@
-.venv
-__pycache__
-.pytest_cache
+# Python & Environments
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
 
+# Android & Gradle Build Artifacts
+.gradle/
+*/.gradle/
+build/
+*/build/
+android_app/build/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.dex
+local.properties
 
-Thumbs.db
-.DS_Store
+# Local Tools & Portable Toolchains
+.tools/
 
+# Keystores, Cryptographic Identity & Databases
 keystore_priv.bin
 keystore_pub.bin
 device_id.txt
+mesh_chat.db
+database.db
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
-.zed
-.vscode
-local.properties
-.gradle
-build
-android_app/build
-gradle.properties
-gradle/
-gradlew
-gradlew.bat
-settings.gradle.kts
+# Memory Dumps, Logs & Temp Files
+*.hprof
+*.log
+*.tmp
+*.bak
+*.zip
+live_device_screen*.png
+current_screen.png
+
+# IDE & Editor Files
+.idea/
+.vscode/
+.zed/
+*.iml
+
+# OS Metadata
+Thumbs.db
+.DS_Store
+desktop.ini
