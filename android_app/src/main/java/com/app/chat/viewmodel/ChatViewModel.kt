@@ -314,6 +314,7 @@ class ChatViewModel : ViewModel() {
         val backendPeers = PythonCoreBridge.getPeers()
         backendPeers.forEach { p ->
             val id = p["id"]?.toString() ?: return@forEach
+            if (id == "test-recipient" || id == "peer1" || id == "9fbf76d1-18fe-4aac-a84a-a56bf6477a1b" || id == userProfile.id) return@forEach
             val name = p["name"]?.toString() ?: "Mesh Peer ${id.take(6)}"
             val dist = p["distance"]?.toString() ?: "~ 5 m"
             val rssi = (p["rssi"] as? Number)?.toInt() ?: -60

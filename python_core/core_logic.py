@@ -22,6 +22,9 @@ KEYSTORE_PRIV_PATH = os.path.join(BASE_DIR, "keystore_priv.bin")
 DEVICE_ID_PATH = os.path.join(BASE_DIR, "device_id.txt")
 
 
+OLD_DUMMY_DEVICE_ID = "9fbf76d1-18fe-4aac-a84a-a56bf6477a1b"
+
+
 def get_or_create_keypair() -> tuple[bytes, bytes] | None:
     """
     Loads the local device's keys from disk.
@@ -30,6 +33,18 @@ def get_or_create_keypair() -> tuple[bytes, bytes] | None:
         tuple[bytes, bytes]: (private_key_bytes, public_key_bytes) on success, None on failure
     """
     try:
+        # Check if device_id is legacy dummy; if so, purge stale keys
+        if os.path.exists(DEVICE_ID_PATH):
+            try:
+                with open(DEVICE_ID_PATH, "r") as f_did:
+                    if f_did.read().strip() == OLD_DUMMY_DEVICE_ID:
+                        if os.path.exists(KEYSTORE_PRIV_PATH):
+                            os.remove(KEYSTORE_PRIV_PATH)
+                        if os.path.exists(KEYSTORE_PUB_PATH):
+                            os.remove(KEYSTORE_PUB_PATH)
+            except Exception:
+                pass
+
         if os.path.exists(KEYSTORE_PRIV_PATH) and os.path.exists(KEYSTORE_PUB_PATH):
             with open(KEYSTORE_PRIV_PATH, "rb") as f_priv:
                 priv_bytes = f_priv.read()
@@ -37,7 +52,8 @@ def get_or_create_keypair() -> tuple[bytes, bytes] | None:
             with open(KEYSTORE_PUB_PATH, "rb") as f_pub:
                 pub_bytes = f_pub.read()
 
-            return priv_bytes, pub_bytes
+            if len(priv_bytes) == KEY_LENGTH and len(pub_bytes) == KEY_LENGTH:
+                return priv_bytes, pub_bytes
 
         pair = generate_keypair()
         if pair is None:
@@ -67,14 +83,16 @@ def get_or_create_keypair() -> tuple[bytes, bytes] | None:
 def get_or_create_device_id() -> str | None:
     """
     Loads this device's persistent UUID from disk.
-    If it doesn't exist, generates a new one and saves it.
+    If it doesn't exist or is the legacy dummy ID, generates a new one and saves it.
     Returns:
         str: the device's UUID, or None on failure.
     """
     try:
         if os.path.exists(DEVICE_ID_PATH):
             with open(DEVICE_ID_PATH, "r") as f:
-                return f.read().strip()
+                val = f.read().strip()
+                if val and val != OLD_DUMMY_DEVICE_ID:
+                    return val
 
         device_id = str(uuid.uuid4())
 
@@ -215,6 +233,16 @@ def init_database() -> dict[str, str | int]:
     """
     if not db_init_database():
         return {"code": ErrorCode.DATABASE_ERROR}
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM peers WHERE peer_id IN ('test-recipient', 'peer1', '9fbf76d1-18fe-4aac-a84a-a56bf6477a1b')")
+            cursor.execute("DELETE FROM messages WHERE recipient_id IN ('test-recipient', 'peer1', '9fbf76d1-18fe-4aac-a84a-a56bf6477a1b') OR sender_id IN ('test-recipient', 'peer1', '9fbf76d1-18fe-4aac-a84a-a56bf6477a1b')")
+            conn.commit()
+        except Exception as e:
+            print(f"Error purging legacy dummy records: {e}")
 
     device_id = get_or_create_device_id()
     if device_id is None:
@@ -533,6 +561,7 @@ def get_peers() -> list[dict[str, str | int]]:
 
     try:
         cursor = connection.cursor()
+        device_id = get_or_create_device_id()
         _ = cursor.execute(
             f"""
             SELECT
@@ -540,8 +569,10 @@ def get_peers() -> list[dict[str, str | int]]:
                 {PEERS.columns.public_key.name},
                 {PEERS.columns.last_seen.name}
             FROM {PEERS.name}
+            WHERE {PEERS.columns.peer_id.name} NOT IN ('test-recipient', 'peer1', '9fbf76d1-18fe-4aac-a84a-a56bf6477a1b', ?)
             ORDER BY {PEERS.columns.last_seen.name} DESC
-            """
+            """,
+            (device_id or "",),
         )
         rows = cursor.fetchall()
 

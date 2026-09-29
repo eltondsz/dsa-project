@@ -525,9 +525,12 @@ class BleMeshManager private constructor(private val context: Context) {
 
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
-                Log.i(TAG, "Services discovered for $peerAddress")
+                Log.i(TAG, "Services discovered for $peerAddress. Total: ${gatt.services.size}")
                 val service = gatt.getService(SERVICE_UUID)
+                    ?: gatt.services.find { it.uuid.toString().equals(SERVICE_UUID.toString(), ignoreCase = true) }
                 val characteristic = service?.getCharacteristic(CHARACTERISTIC_UUID)
+                    ?: service?.characteristics?.find { it.uuid.toString().equals(CHARACTERISTIC_UUID.toString(), ignoreCase = true) }
+
                 if (characteristic != null) {
                     activeGattClients[peerAddress] = gatt
                     isWriting[peerAddress] = false
@@ -544,7 +547,7 @@ class BleMeshManager private constructor(private val context: Context) {
                         processOutbox(peerAddress)
                     }
                 } else {
-                    Log.w(TAG, "Required service/characteristic not found on $peerAddress")
+                    Log.w(TAG, "Required service/characteristic not found on $peerAddress. Found: ${gatt.services.map { it.uuid }}")
                 }
             }
         }
