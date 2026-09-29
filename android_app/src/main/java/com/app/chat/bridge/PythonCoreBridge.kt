@@ -115,14 +115,6 @@ object PythonCoreBridge {
         }
     }
 
-    fun associatePeerAddress(peerUuid: String, bleAddress: String) {
-        try {
-            pythonModule?.callAttr("associate_peer_alias", bleAddress, peerUuid)
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error in associatePeerAddress: ${e.message}")
-        }
-    }
-
     fun triggerPanicWipe(): Boolean {
         return try {
             val result = pythonModule?.callAttr("trigger_panic_wipe")?.asMap()

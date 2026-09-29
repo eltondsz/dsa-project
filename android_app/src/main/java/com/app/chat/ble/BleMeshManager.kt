@@ -55,21 +55,9 @@ class BleMeshManager private constructor(private val context: Context) {
 
     private val discoveredPeersMap = ConcurrentHashMap<String, PeerDevice>()
     private val activeConnections = ConcurrentHashMap<String, BluetoothGatt>()
-    private val uuidToAddressMap = ConcurrentHashMap<String, String>()
-    private val addressToUuidMap = ConcurrentHashMap<String, String>()
-
-    fun registerPeerAddressMapping(uuid: String, address: String) {
-        if (uuid.isNotBlank() && address.isNotBlank()) {
-            uuidToAddressMap[uuid] = address
-            addressToUuidMap[address] = uuid
-        }
-    }
-
-    fun getAddressForUuid(uuid: String): String? = uuidToAddressMap[uuid]
-    fun getUuidForAddress(address: String): String? = addressToUuidMap[address]
 
     var onPeerDiscovered: ((PeerDevice) -> Unit)? = null
-    var onPacketReceived: ((packet: ByteArray, deviceAddress: String?) -> Unit)? = null
+    var onPacketReceived: ((ByteArray) -> Unit)? = null
 
     fun isBluetoothEnabled(): Boolean {
         val adapter = bluetoothManager?.adapter ?: bluetoothAdapter
@@ -263,45 +251,31 @@ class BleMeshManager private constructor(private val context: Context) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
             }
             value?.let { packet ->
-                val senderAddr = device?.address
-                Log.i(TAG, "Received packet of ${packet.size} bytes from $senderAddr")
-                onPacketReceived?.invoke(packet, senderAddr)
+                Log.i(TAG, "Received packet of ${packet.size} bytes from ${device?.address}")
+                onPacketReceived?.invoke(packet)
+                try {
+                    PythonCoreBridge.processIncomingBle(packet)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error processing packet in Python core", e)
+                }
             }
         }
     }
 
     fun sendPayloadToPeer(peerAddress: String, payload: ByteArray) {
-        val adapter = getBluetoothAdapter() ?: return
-        val targetMac = if (BluetoothAdapter.checkBluetoothAddress(peerAddress)) {
-            peerAddress
-        } else {
-            uuidToAddressMap[peerAddress] ?: discoveredPeersMap.keys.firstOrNull() ?: peerAddress
-        }
+        val device = bluetoothAdapter?.getRemoteDevice(peerAddress) ?: return
+        val existingGatt = activeConnections[peerAddress]
 
-        if (!BluetoothAdapter.checkBluetoothAddress(targetMac)) {
-            Log.w(TAG, "Cannot send packet: invalid Bluetooth address '$targetMac'")
-            activeConnections.values.forEach { gatt -> writeCharacteristic(gatt, payload) }
-            return
-        }
-
-        val device = try {
-            adapter.getRemoteDevice(targetMac)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get remote device for $targetMac", e)
-            return
-        }
-
-        val existingGatt = activeConnections[targetMac]
         if (existingGatt != null) {
             writeCharacteristic(existingGatt, payload)
         } else {
             device.connectGatt(context, false, object : BluetoothGattCallback() {
                 override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
-                    if (newState == BluetoothProfile.STATE_CONNECTED && gatt != null) {
-                        Log.i(TAG, "Connected to GATT peer $targetMac, requesting MTU 512")
-                        gatt.requestMtu(512)
+                    if (newState == BluetoothProfile.STATE_CONNECTED) {
+                        Log.i(TAG, "Connected to GATT peer $peerAddress, requesting MTU 512")
+                        gatt?.requestMtu(512)
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        activeConnections.remove(targetMac)
+                        activeConnections.remove(peerAddress)
                         gatt?.close()
                     }
                 }
@@ -312,7 +286,7 @@ class BleMeshManager private constructor(private val context: Context) {
 
                 override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
                     if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
-                        activeConnections[targetMac] = gatt
+                        activeConnections[peerAddress] = gatt
                         writeCharacteristic(gatt, payload)
                     }
                 }
@@ -321,18 +295,15 @@ class BleMeshManager private constructor(private val context: Context) {
     }
 
     private fun writeCharacteristic(gatt: BluetoothGatt, data: ByteArray) {
-        val service = gatt.getService(SERVICE_UUID) ?: run {
-            gatt.discoverServices()
-            return
-        }
+        val service = gatt.getService(SERVICE_UUID) ?: return
         val characteristic = service.getCharacteristic(CHARACTERISTIC_UUID) ?: return
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+            gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
         } else {
             @Suppress("DEPRECATION")
             characteristic.value = data
             @Suppress("DEPRECATION")
-            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             @Suppress("DEPRECATION")
             gatt.writeCharacteristic(characteristic)
         }

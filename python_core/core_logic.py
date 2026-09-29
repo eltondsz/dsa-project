@@ -151,16 +151,6 @@ def _ensure_peer_exists(peer_id: str, public_key: bytes | None = None) -> bool:
         return False
 
 
-_PEER_ALIAS_MAP: dict[str, str] = {}
-
-
-def associate_peer_alias(alias: str, peer_uuid: str) -> None:
-    """Associates an alias (such as BLE MAC address) with a peer UUID."""
-    if alias and peer_uuid:
-        _PEER_ALIAS_MAP[alias] = peer_uuid
-        _PEER_ALIAS_MAP[peer_uuid] = alias
-
-
 def _get_peer_public_key(peer_id: str) -> bytes | None:
     """Retrieves a peer's public key from the database."""
     connection = get_db_connection()
@@ -170,7 +160,6 @@ def _get_peer_public_key(peer_id: str) -> bytes | None:
     try:
         cursor = connection.cursor()
 
-        # 1. Direct match on peer_id
         _ = cursor.execute(
             f"""SELECT {PEERS.columns.public_key.name}
             FROM {PEERS.name}
@@ -178,49 +167,19 @@ def _get_peer_public_key(peer_id: str) -> bytes | None:
             (peer_id,),
         )
         row = cast(SQLITE3_ROW_TYPE | None, cursor.fetchone())
-        if row is not None:
-            public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
-            if public_key and len(public_key) == KEY_LENGTH:
-                return public_key
 
-        # 2. Check alias map
-        resolved_uuid = _PEER_ALIAS_MAP.get(peer_id)
-        if resolved_uuid:
-            _ = cursor.execute(
-                f"""SELECT {PEERS.columns.public_key.name}
-                FROM {PEERS.name}
-                WHERE {PEERS.columns.peer_id.name} = ?""",
-                (resolved_uuid,),
-            )
-            row = cast(SQLITE3_ROW_TYPE | None, cursor.fetchone())
-            if row is not None:
-                public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
-                if public_key and len(public_key) == KEY_LENGTH:
-                    return public_key
+        if row is None:
+            return None
 
-        # 3. Fallback: single remote peer in database (1-on-1 direct chat)
-        my_id = get_or_create_device_id()
-        _ = cursor.execute(
-            f"""SELECT {PEERS.columns.public_key.name}
-            FROM {PEERS.name}
-            WHERE {PEERS.columns.peer_id.name} != ?
-              AND {PEERS.columns.public_key.name} IS NOT NULL
-              AND LENGTH({PEERS.columns.public_key.name}) = 32
-            ORDER BY {PEERS.columns.last_seen.name} DESC
-            LIMIT 1""",
-            (my_id or "",),
-        )
-        row = cast(SQLITE3_ROW_TYPE | None, cursor.fetchone())
-        if row is not None:
-            public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
-            if public_key and len(public_key) == KEY_LENGTH:
-                return public_key
+        public_key = cast(bytes | None, row[PEERS.columns.public_key.name])
+
+        if public_key and len(public_key) == KEY_LENGTH:
+            return public_key
 
     except sqlite3.Error as e:
         print(f"Database error retrieving peer public key: {e}")
 
     return None
-
 
 
 def init_database() -> dict[str, str | int]:
@@ -544,6 +503,106 @@ def process_incoming_ble(raw_payload: bytes | str) -> dict[str, str | int]:
 
     return {"code": ErrorCode.UNKNOWN_PACKET_TYPE}
 
+
+def get_peers() -> list[dict[str, str | int]]:
+    """Returns a list of known peers with their metadata."""
+    connection = get_db_connection()
+    if connection is None:
+        return []
+
+    try:
+        cursor = connection.cursor()
+        _ = cursor.execute(
+            f"""
+            SELECT
+                {PEERS.columns.peer_id.name},
+                {PEERS.columns.public_key.name},
+                {PEERS.columns.last_seen.name}
+            FROM {PEERS.name}
+            ORDER BY {PEERS.columns.last_seen.name} DESC
+            """
+        )
+        rows = cursor.fetchall()
+
+        peers = []
+        for row in rows:
+            peer_id = row[PEERS.columns.peer_id.name]
+            public_key = row[PEERS.columns.public_key.name]
+            last_seen = row[PEERS.columns.last_seen.name]
+
+            # Calculate distance based on time since last seen (simplified)
+            time_since_seen = int(time.time()) - last_seen if last_seen > 0 else 9999
+            # Convert to rough distance estimate (this is a placeholder - real implementation would use RSSI)
+            distance_meters = min(float(time_since_seen), 100.0)  # Cap at 100m for demo
+
+            # Format distance text
+            if distance_meters < 1:
+                distance_text = "< 1 m"
+            else:
+                distance_text = f"~ {int(distance_meters)} m"
+
+            # Determine if online (seen within last 60 seconds)
+            is_online = time_since_seen < 60
+
+            peers.append({
+                "id": peer_id,
+                "name": f"Peer-{peer_id[-4:]}" if len(peer_id) >= 4 else f"Peer-{peer_id}",
+                "distanceText": distance_text,
+                "distanceMeters": distance_meters,
+                "rssi": max(-100, min(-20, int(-60 - (distance_meters / 2)))),  # Rough RSSI estimate
+                "isOnline": is_online,
+                "publicKey": public_key.hex() if public_key else ""
+            })
+
+        return peers
+
+    except sqlite3.Error as e:
+        print(f"Database error getting peers: {e}")
+        return []
+
+
+def get_storage_breakdown() -> dict[str, int]:
+    """Returns storage usage breakdown by message type."""
+    connection = get_db_connection()
+    if connection is None:
+        return {
+            "messagesBytes": 0,
+            "imagesBytes": 0,
+            "voiceBytes": 0,
+            "otherBytes": 0
+        }
+
+    try:
+        cursor = connection.cursor()
+
+        # Get total messages size
+        _ = cursor.execute(f"SELECT SUM(LENGTH({MESSAGES.columns.payload.name})) FROM {MESSAGES.name}")
+        total_payload_size = cursor.fetchone()[0] or 0
+
+        # For now, we'll categorize all as messages since we don't have media type in payload
+        # In a real implementation, we might check the decrypted content or have metadata
+        messages_bytes = total_payload_size * 2  # Approximate size including overhead
+
+        # Placeholder values for other categories (would be enhanced with media type detection)
+        images_bytes = 0
+        voice_bytes = 0
+        other_bytes = max(0, messages_bytes // 10)  # Some overhead
+
+        return {
+            "messagesBytes": messages_bytes,
+            "imagesBytes": images_bytes,
+            "voiceBytes": voice_bytes,
+            "otherBytes": other_bytes
+        }
+
+    except sqlite3.Error as e:
+        print(f"Database error getting storage breakdown: {e}")
+        return {
+            "messagesBytes": 0,
+            "imagesBytes": 0,
+            "voiceBytes": 0,
+            "otherBytes": 0
+        }
 
 
 def trigger_panic_wipe() -> dict[str, str | int]:

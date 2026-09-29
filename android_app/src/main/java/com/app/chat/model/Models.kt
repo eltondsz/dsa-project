@@ -62,9 +62,7 @@ data class ChatConversation(
     val isGroup: Boolean = false,
     val avatarInitials: String = name.take(1).uppercase(),
     val isOnline: Boolean = true,
-    val membersCount: Int = 1,
-    val peerAddress: String = "",
-    val peerUuid: String = ""
+    val membersCount: Int = 1
 )
 
 data class PeerDevice(
@@ -74,26 +72,23 @@ data class PeerDevice(
     val distanceMeters: Float = 5f,
     val rssi: Int = -65,
     val isOnline: Boolean = true,
-    val publicKey: String = "",
-    val bleAddress: String = id,
-    val peerUuid: String = ""
+    val publicKey: String = ""
 )
 
 data class UserProfile(
-    val id: String = "",
-    val displayName: String = "",
-    val publicKey: String = "",
+    val id: String = "node-pub-9921",
+    val displayName: String = "Elton",
+    val publicKey: String = "0x89ab...34fe",
     val deviceName: String = "This Device",
     val isDiscoveryEnabled: Boolean = true,
     val bio: String = "Encrypted BLE Mesh Node • Offline First"
 )
 
 data class StorageStats(
-    val usedBytes: Long = 0L,
-    val totalBytes: Long = 100_000_000L,
-    val messagesBytes: Long = 0L,
-    val imagesBytes: Long = 0L,
-    val voiceBytes: Long = 0L,
-    val otherBytes: Long = 0L
+    val usedBytes: Long = 1_400_000_000L,
+    val totalBytes: Long = 5_000_000_000L,
+    val messagesBytes: Long = 842_000_000L,
+    val imagesBytes: Long = 392_000_000L,
+    val voiceBytes: Long = 121_000_000L,
+    val otherBytes: Long = 45_000_000L
 )
-
