@@ -216,7 +216,8 @@ fun NearbyRadarScreen(
                 items(viewModel.nearbyPeers, key = { it.id }) { peer ->
                     DiscoveredPeerRow(
                         peer = peer,
-                        onChatClick = { viewModel.openDirectChatWithPeer(peer) }
+                        onChatClick = { viewModel.openDirectChatWithPeer(peer) },
+                        onPingClick = { viewModel.sendPing(peer.id) }
                     )
                 }
             }
@@ -228,6 +229,7 @@ fun NearbyRadarScreen(
 fun DiscoveredPeerRow(
     peer: PeerDevice,
     onChatClick: () -> Unit,
+    onPingClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -263,13 +265,24 @@ fun DiscoveredPeerRow(
             }
         }
 
-        Button(
-            onClick = onChatClick,
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-            shape = RoundedCornerShape(8.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-        ) {
-            Text("Chat", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (onPingClick != null) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onPingClick,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text("Ping", fontSize = 12.sp, color = TextPrimary)
+                }
+            }
+            Button(
+                onClick = onChatClick,
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text("Chat", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -499,13 +512,12 @@ fun MeshGraphScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 viewModel.nearbyPeers.forEach { peer ->
-                    val isNetChat = peer.name.contains("Mesh") || peer.name.contains("NetChat")
-                    val via = if (isNetChat) "Direct BLE Link" else "BLE Beacon"
+                    val via = if (peer.isDirect) "Direct BLE Link" else "Multi-hop Relay"
                     RouteRow(
                         from = "You (${viewModel.userProfile.displayName.take(12)})",
                         via = via,
                         to = peer.name,
-                        status = "1 Hop • ${peer.rssi} dBm"
+                        status = "${peer.distanceText} • ${peer.rssi} dBm"
                     )
                 }
             }

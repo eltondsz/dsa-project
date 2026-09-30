@@ -275,6 +275,7 @@ def prepare_handshake_packet() -> dict[str, str | int]:
 
         packet = HANDSHAKE_PACKET_FORMAT.pack(
             hop_count=bytes([1]),
+            packet_type=bytes([PacketType.HANDSHAKE]),
             sender_uuid=uuid.UUID(device_id).bytes,
             public_key=pub_bytes,
         )
@@ -321,6 +322,7 @@ def prepare_outgoing_message(recipient_uuid: str, message: str) -> dict[str, str
 
         packet = MESSAGE_PACKET_FORMAT.pack(
             hop_count=bytes([1]),
+            packet_type=bytes([PacketType.MESSAGE]),
             message_uuid=message_uuid_bytes,
             sender_uuid=sender_uuid_bytes,
             ciphertext=encrypted_payload,
@@ -807,6 +809,9 @@ def get_messages_for_peer(peer_id: str) -> list[dict[str, str | int]]:
                 except Exception as e:
                     print(f"Error decrypting message: {e}")
 
+            if not plaintext and payload_hex:
+                plaintext = str(payload_hex)
+
             result.append({
                 MESSAGES.columns.msg_id.name: row[MESSAGES.columns.msg_id.name],
                 MESSAGES.columns.sender_id.name: row[MESSAGES.columns.sender_id.name],
@@ -819,3 +824,43 @@ def get_messages_for_peer(peer_id: str) -> list[dict[str, str | int]]:
     except sqlite3.Error as e:
         print(f"Database error in get_messages_for_peer: {e}")
         return []
+
+
+def record_raw_chat_message(
+    sender_id: str,
+    recipient_id: str | None,
+    text: str,
+    is_incoming: bool = True
+) -> bool:
+    """Records a plaintext or decoded chat message directly into SQLite."""
+    conn = get_db_connection()
+    if conn is None:
+        return False
+    try:
+        _ensure_peer_exists(sender_id)
+        if recipient_id and recipient_id != "public":
+            _ensure_peer_exists(recipient_id)
+        cursor = conn.cursor()
+        msg_id = str(uuid.uuid4())
+        status = MessageStatus.RECEIVED if is_incoming else MessageStatus.SENT
+        cursor.execute(
+            f"""
+            INSERT OR IGNORE INTO {MESSAGES.name}
+            (
+                {MESSAGES.columns.msg_id.name},
+                {MESSAGES.columns.sender_id.name},
+                {MESSAGES.columns.recipient_id.name},
+                {MESSAGES.columns.payload.name},
+                {MESSAGES.columns.timestamp.name},
+                {MESSAGES.columns.status.name}
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (msg_id, sender_id, recipient_id or "public", text, int(time.time()), status),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error in record_raw_chat_message: {e}")
+        return False
+

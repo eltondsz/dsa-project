@@ -140,4 +140,15 @@ object PythonCoreBridge {
             true
         }
     }
+
+    fun recordChatMessage(senderId: String, recipientId: String?, text: String, isIncoming: Boolean): Boolean {
+        return try {
+            val result = pythonModule?.callAttr("record_raw_chat_message", senderId, recipientId, text, isIncoming)
+            result?.toBoolean() ?: false
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error in recordChatMessage: ${e.message}")
+            false
+        }
+    }
 }
+

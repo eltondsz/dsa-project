@@ -106,12 +106,14 @@ fun DirectChatScreen(
         containerColor = BackgroundDark,
         topBar = {
             Box(Modifier.statusBarsPadding()) {
+                val targetPeerHex = conversation?.peerIdHex ?: convId.removePrefix("chat-")
                 ChatTopBar(
                     title = conversation?.name ?: "Direct Chat",
                     subtitle = if (conversation?.isOnline == true) "● Online via Bluetooth" else "○ Last seen 10m ago",
                     isOnline = conversation?.isOnline == true,
                     avatarInitials = conversation?.avatarInitials ?: "P",
-                    onBack = { viewModel.handleBack() }
+                    onBack = { viewModel.handleBack() },
+                    onPing = if (targetPeerHex.length == 16) { { viewModel.sendPing(targetPeerHex) } } else null
                 )
             }
         },
@@ -317,6 +319,7 @@ fun ChatTopBar(
     isOnline: Boolean,
     avatarInitials: String,
     onBack: () -> Unit,
+    onPing: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -365,13 +368,27 @@ fun ChatTopBar(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(BackgroundDark)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
-            Text("🔒 AES-GCM", color = PrimaryBlue, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onPing != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(PrimaryBlue.copy(alpha = 0.2f))
+                        .clickable(onClick = onPing)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("🏓 Ping", color = PrimaryBlue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(BackgroundDark)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text("🔒 Mesh", color = PrimaryBlue, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -407,6 +424,30 @@ fun MessageBubble(
     onToggleVoice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    if (message.isSystem) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SurfaceDark.copy(alpha = 0.8f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = message.text,
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
+    }
+
     val bubbleColor = if (message.isIncoming) SurfaceDark else PrimaryBlue
     val textColor = if (message.isIncoming) TextPrimary else Color.White
     val alignment = if (message.isIncoming) Alignment.Start else Alignment.End
@@ -415,14 +456,31 @@ fun MessageBubble(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
-        if (showSenderName) {
-            Text(
-                text = message.senderName,
-                color = PrimaryBlue,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)
-            )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = if (message.isIncoming) 8.dp else 0.dp, end = if (!message.isIncoming) 8.dp else 0.dp, bottom = 2.dp)
+        ) {
+            if (showSenderName && message.isIncoming) {
+                Text(
+                    text = message.senderName,
+                    color = PrimaryBlue,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(Modifier.width(6.dp))
+            }
+            if (message.isIncoming) {
+                val hopLabel = if (message.isDirect || message.hopCount <= 1) "Direct (1 hop)" else "${message.hopCount} hops"
+                val hopBg = if (message.isDirect || message.hopCount <= 1) Color(0xFF1B5E20) else Color(0xFF0D47A1)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(hopBg)
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(hopLabel, color = Color.White, fontSize = 9.sp)
+                }
+            }
         }
 
         Box(

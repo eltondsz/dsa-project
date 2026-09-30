@@ -8,8 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.View
-import androidx.core.view.WindowCompat
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import com.app.chat.ble.BleMeshManager
 import com.app.chat.bridge.PythonCoreBridge
 import com.app.chat.model.Screen
@@ -61,7 +62,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         PythonCoreBridge.initialize(applicationContext)
-        val bleManager = BleMeshManager.getInstance(applicationContext)
+        val bleManager = BleMeshManager.getInstance(applicationContext, viewModel.meshEngine, lifecycleScope)
         viewModel.setBleManager(bleManager)
 
         window.statusBarColor = android.graphics.Color.TRANSPARENT
@@ -92,6 +93,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        BleMeshManager.getExistingInstance()?.stopMesh()
+    }
 }
 
 @Composable
@@ -111,12 +117,8 @@ fun AppRoot(viewModel: ChatViewModel) {
     ) { _ ->
         val isNowEnabled = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter?.isEnabled == true
         viewModel.isBluetoothEnabled = isNowEnabled
-        if (isNowEnabled) {
-            val ble = BleMeshManager.getInstance(context)
-            if (ble.initialize()) {
-                ble.startAdvertising(viewModel.userProfile.displayName)
-                ble.startScanning()
-            }
+        if (isNowEnabled && hasPermissions) {
+            viewModel.bleMeshManager?.startMesh()
         }
     }
 
@@ -129,14 +131,19 @@ fun AppRoot(viewModel: ChatViewModel) {
 
     LaunchedEffect(hasPermissions) {
         if (hasPermissions) {
-            val ble = BleMeshManager.getInstance(context)
-            if (ble.initialize()) {
-                viewModel.isBluetoothEnabled = true
-                ble.startAdvertising(viewModel.userProfile.displayName)
-                ble.startScanning()
+            viewModel.checkBluetoothStatus()
+            if (viewModel.isBluetoothEnabled) {
+                viewModel.bleMeshManager?.startMesh()
             } else {
-                viewModel.checkBluetoothStatus()
+                viewModel.requestEnableBluetooth()
             }
+        }
+    }
+
+    LaunchedEffect(viewModel.pingNotification) {
+        viewModel.pingNotification?.let { notice ->
+            Toast.makeText(context, notice, Toast.LENGTH_SHORT).show()
+            viewModel.pingNotification = null
         }
     }
 
@@ -146,11 +153,9 @@ fun AppRoot(viewModel: ChatViewModel) {
         hasPermissions = permissions.all { results[it] == true }
         viewModel.isBlePermissionGranted = hasPermissions
         if (hasPermissions) {
-            val ble = BleMeshManager.getInstance(context)
-            if (ble.initialize()) {
-                viewModel.isBluetoothEnabled = true
-                ble.startAdvertising(viewModel.userProfile.displayName)
-                ble.startScanning()
+            viewModel.checkBluetoothStatus()
+            if (viewModel.isBluetoothEnabled) {
+                viewModel.bleMeshManager?.startMesh()
             } else {
                 viewModel.requestEnableBluetooth()
             }

@@ -50,7 +50,10 @@ data class MessageItem(
     val status: MessageStatus = MessageStatus.Delivered,
     val mediaType: MediaType = MediaType.Text,
     val mediaDuration: String? = null,
-    val mediaThumbnail: String? = null
+    val mediaThumbnail: String? = null,
+    val hopCount: Int = 1,
+    val isDirect: Boolean = true,
+    val isSystem: Boolean = false
 )
 
 data class ChatConversation(
@@ -62,7 +65,8 @@ data class ChatConversation(
     val isGroup: Boolean = false,
     val avatarInitials: String = name.take(1).uppercase(),
     val isOnline: Boolean = true,
-    val membersCount: Int = 1
+    val membersCount: Int = 1,
+    val peerIdHex: String? = null
 )
 
 data class PeerDevice(
@@ -72,16 +76,18 @@ data class PeerDevice(
     val distanceMeters: Float = 5f,
     val rssi: Int = -65,
     val isOnline: Boolean = true,
-    val publicKey: String = ""
+    val publicKey: String = "",
+    val hopCount: Int = 1,
+    val isDirect: Boolean = true
 )
 
 data class UserProfile(
     val id: String = "node-pub-9921",
-    val displayName: String = "Elton",
+    val displayName: String = "Node",
     val publicKey: String = "0x89ab...34fe",
     val deviceName: String = "This Device",
     val isDiscoveryEnabled: Boolean = true,
-    val bio: String = "Encrypted BLE Mesh Node • Offline First"
+    val bio: String = "Encrypted BLE Mesh Node • BitChat Mesh Active"
 )
 
 data class StorageStats(
@@ -92,3 +98,4 @@ data class StorageStats(
     val voiceBytes: Long = 121_000_000L,
     val otherBytes: Long = 45_000_000L
 )
+
