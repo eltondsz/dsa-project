@@ -73,8 +73,7 @@ class BleMeshManager private constructor(private val context: Context) {
     private val nextPacketSeq = AtomicInteger(1)
     private val chunkAssemblies = ConcurrentHashMap<String, ConcurrentHashMap<Int, ByteArray>>()
     private val lastWriteTimestamp = ConcurrentHashMap<String, Long>()
-    @Volatile
-    private var latestConnectedClient: BluetoothDevice? = null
+    private val seenPacketIds = ConcurrentHashMap<String, Boolean>()
 
     var onPeerDiscovered: ((PeerDevice) -> Unit)? = null
     var onPacketReceived: ((packet: ByteArray, senderAddress: String?) -> Unit)? = null
@@ -303,13 +302,9 @@ class BleMeshManager private constructor(private val context: Context) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.i(TAG, "GATT Server: Client connected from $address")
                 serverConnectedClients[address] = device
-                latestConnectedClient = device
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "GATT Server: Client disconnected from $address")
                 serverConnectedClients.remove(address)
-                if (latestConnectedClient?.address == address) {
-                    latestConnectedClient = null
-                }
             }
         }
 
@@ -327,7 +322,6 @@ class BleMeshManager private constructor(private val context: Context) {
             }
             if (device != null) {
                 serverConnectedClients[device.address] = device
-                latestConnectedClient = device
             }
             value?.let { packet ->
                 handleIncomingPacketBytes(packet, device?.address)
@@ -349,7 +343,6 @@ class BleMeshManager private constructor(private val context: Context) {
             }
             if (device != null) {
                 serverConnectedClients[device.address] = device
-                latestConnectedClient = device
             }
             Log.i(TAG, "GATT Server: Descriptor write request from ${device?.address}")
         }
@@ -378,13 +371,36 @@ class BleMeshManager private constructor(private val context: Context) {
                 }
                 val assembledBytes = bos.toByteArray()
                 Log.i(TAG, "Assembled complete packet (${assembledBytes.size} bytes) from $senderAddress")
-                onPacketReceived?.invoke(assembledBytes, senderAddress)
+                deliverAndRelay(assembledBytes, senderAddress)
             }
             return
         }
 
         Log.i(TAG, "Received raw BLE packet (${packet.size} bytes) from $senderAddress")
+        deliverAndRelay(packet, senderAddress)
+    }
+
+    private fun deliverAndRelay(packet: ByteArray, senderAddress: String?) {
+        if (!markPacketSeen(packet)) return
+
+        // Byte 0 is the hop count. Forward each message once, up to the seven-hop limit.
+        val hopCount = packet.firstOrNull()?.toInt()?.and(0xFF) ?: return
+        if (packet.getOrNull(1) == 0x01.toByte() && hopCount in 1..6) {
+            packet.copyOf().also {
+                it[0] = (hopCount + 1).toByte()
+                broadcastPacket(it, senderAddress)
+            }
+        }
         onPacketReceived?.invoke(packet, senderAddress)
+    }
+
+    private fun markPacketSeen(packet: ByteArray): Boolean {
+        if (packet.size < 18) return true
+        val packetId = android.util.Base64.encodeToString(packet, 1, 17, android.util.Base64.NO_WRAP)
+        if (seenPacketIds.putIfAbsent(packetId, true) != null) return false
+        // ponytail: fixed-size recent cache; use expiring IDs if mesh throughput exceeds this limit.
+        if (seenPacketIds.size > 1_024) seenPacketIds.clear()
+        return true
     }
 
     fun sendPayloadToPeer(peerAddress: String, payload: ByteArray) {
@@ -392,6 +408,7 @@ class BleMeshManager private constructor(private val context: Context) {
             Log.w(TAG, "sendPayloadToPeer: invalid Bluetooth address '$peerAddress'")
             return
         }
+        markPacketSeen(payload)
         if (payload.size <= 20 && payload.firstOrNull() != MAGIC_CHUNK_BYTE) {
             enqueueRawPacket(peerAddress, payload)
         } else {
@@ -455,7 +472,7 @@ class BleMeshManager private constructor(private val context: Context) {
         }
 
         // 2. If peer is connected to our GATT Server as a client, notify the client
-        val serverClient = serverConnectedClients[peerAddress] ?: latestConnectedClient
+        val serverClient = serverConnectedClients[peerAddress]
         if (serverClient != null && gattServer != null) {
             val service = gattServer?.getService(SERVICE_UUID)
             val characteristic = service?.getCharacteristic(CHARACTERISTIC_UUID)
@@ -641,13 +658,13 @@ class BleMeshManager private constructor(private val context: Context) {
         }
     }
 
-    fun broadcastPacket(payload: ByteArray) {
+    fun broadcastPacket(payload: ByteArray, exceptAddress: String? = null) {
         val allTargetAddresses = mutableSetOf<String>()
         allTargetAddresses.addAll(discoveredPeersMap.keys)
         allTargetAddresses.addAll(activeGattClients.keys)
         allTargetAddresses.addAll(serverConnectedClients.keys)
 
-        allTargetAddresses.forEach { addr ->
+        allTargetAddresses.filter { it != exceptAddress }.forEach { addr ->
             sendPayloadToPeer(addr, payload)
         }
     }

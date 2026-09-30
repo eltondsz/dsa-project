@@ -11,6 +11,21 @@ object PythonCoreBridge {
     private var isInitialized = false
     private var pythonModule: PyObject? = null
 
+    private fun pyValueToKotlin(value: PyObject?): Any? {
+        val text = value?.toString() ?: return null
+        if (text == "None") return null
+        text.toLongOrNull()?.let { return it }
+        return when (text) {
+            "True" -> true
+            "False" -> false
+            else -> text
+        }
+    }
+
+    private fun pyMapToKotlin(value: PyObject?): Map<String, Any?>? {
+        return value?.asMap()?.mapKeys { it.key.toString() }?.mapValues { pyValueToKotlin(it.value) }
+    }
+
     fun initialize(context: Context): Boolean {
         if (isInitialized && pythonModule != null) return true
         return try {
@@ -74,7 +89,7 @@ object PythonCoreBridge {
     fun processIncomingBle(rawPayload: ByteArray): Map<String, Any?>? {
         return try {
             val result = pythonModule?.callAttr("process_incoming_ble", rawPayload)
-            result?.asMap()?.mapKeys { it.key.toString() }
+            pyMapToKotlin(result)
         } catch (e: Throwable) {
             Log.e(TAG, "Error in processIncomingBle: ${e.message}")
             null
@@ -85,7 +100,7 @@ object PythonCoreBridge {
         return try {
             val result = pythonModule?.callAttr("get_peers")?.asList()
             result?.mapNotNull { item ->
-                item?.asMap()?.mapKeys { it.key.toString() }
+                pyMapToKotlin(item)
             } ?: emptyList()
         } catch (e: Throwable) {
             Log.e(TAG, "Error in getPeers: ${e.message}")
@@ -97,7 +112,7 @@ object PythonCoreBridge {
         return try {
             val result = pythonModule?.callAttr("get_messages_for_peer", peerId)
             result?.asList()?.mapNotNull { item ->
-                item.asMap()?.mapKeys { it.key.toString() }
+                pyMapToKotlin(item)
             } ?: emptyList()
         } catch (e: Throwable) {
             Log.e(TAG, "Error in getMessagesForPeer: ${e.message}")
